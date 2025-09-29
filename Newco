@@ -1,0 +1,115 @@
+const renderTableHeader = () => (
+  <thead className="bg-gray-50 border-b border-gray-300 sticky top-0 z-10">
+    {/* Column headers */}
+    <tr>
+      {[
+        { label: 'Clinical trial', key: 'trial' },
+        { label: 'Language', key: 'language' },
+        { label: 'Country/Region', key: 'country' },
+        { label: 'Mobile', key: 'mobile' },
+        { label: 'Card ID', key: 'cardId' },
+        { label: 'Request ID', key: 'requestId' },
+        { label: 'Sent date', key: 'sentDate' },
+        { label: 'Status', key: 'status' },
+      ].map(({ label, key }) => (
+        <th
+          key={key}
+          className="px-3 py-2 cursor-pointer font-semibold text-left"
+          onClick={() => handleSort(key as SortableColumn)}
+        >
+          {label} {renderSortIcon(key as SortableColumn)}
+        </th>
+      ))}
+      <th className="px-3 py-2 w-20"></th>
+    </tr>
+
+    {/* Filters row */}
+    <tr className="bg-gray-50">
+      <td colSpan={9} className="px-3 py-2">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-4 text-xs">
+          {/* Search */}
+          <div className="relative w-full sm:w-56">
+            <input
+              type="search"
+              placeholder="Search"
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full px-4 py-1 border rounded-full text-sm"
+            />
+            <span className="absolute right-3 top-1.5 text-sm">🔍</span>
+          </div>
+
+          {/* Group */}
+          <div className="flex items-center gap-x-2">
+            <span className="font-semibold">GROUP</span>
+            <select
+              value={groupBy || ''}
+              onChange={(e) => setGroupBy(e.target.value as GroupByOption)}
+              className="px-2 py-1 w-24 h-8 bg-gray-100 rounded-md border"
+            >
+              <option value="">Select</option>
+              <option value="trial">Trial</option>
+              <option value="country">Country</option>
+              <option value="language">Language</option>
+            </select>
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-semibold">FILTER</span>
+            {['trial', 'country', 'language', 'status'].map((key) => (
+              <select
+                key={key}
+                value={filters[key] || ''}
+                onChange={(e) => handleFilterChange(key, e.target.value)}
+                className="px-2 py-1 w-30 h-8 bg-gray-100 rounded-md border"
+              >
+                <option value="">
+                  {key === 'trial'
+                    ? 'Clinical Trial'
+                    : key === 'country'
+                    ? 'Country/Region'
+                    : key.charAt(0).toUpperCase() + key.slice(1)}
+                </option>
+                {[...new Set(data.map((row) => (row as any)[key]).filter(Boolean))].map((val) => (
+                  <option key={val} value={val}>
+                    {val}
+                  </option>
+                ))}
+              </select>
+            ))}
+          </div>
+
+          {/* Date */}
+          <div className="flex items-center space-x-2">
+            <span className="font-bold">DATE</span>
+            <div className="flex items-center h-8 w-44 border rounded-md">
+              <DatePicker
+                selected={startDate}
+                onChange={(date: Date) => setStartDate(date)}
+                placeholderText="Start"
+                className="w-20 px-1 text-xs"
+                dateFormat="dd/MM/yyyy"
+              />
+              <div className="h-full w-px bg-gray-300" />
+              <DatePicker
+                selected={endDate}
+                onChange={(date: Date) => setEndDate(date)}
+                placeholderText="End"
+                className="w-20 px-1 text-xs"
+                dateFormat="dd/MM/yyyy"
+              />
+            </div>
+          </div>
+
+          {/* Clear Filters */}
+          {(Object.keys(filters).length > 0 || groupBy || search || startDate || endDate) && (
+            <button onClick={clearFilters} className="ml-2 px-3 py-1 rounded-full border text-xs">
+              ✕
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
+  </thead>
+);
