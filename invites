@@ -12,7 +12,7 @@ const AddInviteModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [country, setCountry] = useState('');
   const [language, setLanguage] = useState('');
   const [mobiles, setMobiles] = useState(['']);
-  const [activeSlide, setActiveSlide] = useState<'Main' | 'Mobile'>('Main');
+  const [showMobileSlide, setShowMobileSlide] = useState(false);
 
   if (!isOpen) return null;
 
@@ -51,18 +51,16 @@ const AddInviteModal: React.FC<Props> = ({ isOpen, onClose }) => {
         </button>
 
         <div className="relative h-[80vh] overflow-hidden">
-          <div
-            className="flex h-full w-[200%] transition-transform duration-300 ease-in-out"
-            style={{ transform: activeSlide === 'Main' ? 'translateX(0%)' : 'translateX(-50%)' }}
-          >
-            {/* Slide 1: Main Page */}
+          {/* Main content: two columns (Demographics + Mobile) */}
+          <div className="flex h-full">
+            {/* Left: Demographics */}
             <div className="w-1/2 h-full bg-white p-6 overflow-y-auto">
               <h2 className="text-2xl font-semibold text-gray-800 mb-4">Add Invites</h2>
 
-              {/* Three-line category button to open Mobile page (moved to top) */}
+              {/* Small icon button to open slide Mobile page */}
               <button
                 type="button"
-                onClick={() => setActiveSlide('Mobile')}
+                onClick={() => setShowMobileSlide(true)}
                 className="mb-4 w-10 h-10 flex items-center justify-center border rounded-full bg-gray-50 hover:bg-gray-100 transition-colors"
               >
                 <svg
@@ -126,20 +124,8 @@ const AddInviteModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 </div>
               </div>
             </div>
-
-            {/* Slide 2: Mobile Page */}
+            {/* Right: Mobile (visible on main) */}
             <div className="w-1/2 h-full bg-gray-100 p-6 flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <button
-                  type="button"
-                  onClick={() => setActiveSlide('Main')}
-                  className="text-sm text-gray-700 hover:underline"
-                >
-                  ← Back
-                </button>
-               
-              </div>
-
               <div className="flex items-center gap-2 mb-2">
                 <span className="bg-blue-600 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full">2</span>
                 <span className="text-xs text-gray-500">(up to 10 numbers)</span>
@@ -189,6 +175,66 @@ const AddInviteModal: React.FC<Props> = ({ isOpen, onClose }) => {
               </div>
             </div>
           </div>
+
+          {/* Slide-in Mobile overlay */}
+          <div
+            className="absolute inset-0 bg-gray-100 p-6 transition-transform duration-300 ease-in-out"
+            style={{ transform: showMobileSlide ? 'translateX(0%)' : 'translateX(100%)' }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <button
+                type="button"
+                onClick={() => setShowMobileSlide(false)}
+                className="text-sm text-gray-700 hover:underline"
+              >
+                ← Back
+              </button>
+              <span className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Mobile</span>
+            </div>
+
+            <div className="overflow-y-auto h-[calc(100%-56px)] pr-2">
+              {mobiles.map((mobile, index) => (
+                <div key={index} className="flex items-center gap-2 mb-3">
+                  <span className="text-sm text-gray-500 w-6 text-right">{index + 1}</span>
+                  <input
+                    type="text"
+                    value={mobile}
+                    onChange={(e) => handleMobileChange(index, e.target.value)}
+                    placeholder="(000) 000 - 0000"
+                    className="flex-1 border border-gray-300 rounded px-3 py-2"
+                  />
+                  {mobiles.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveMobile(index)}
+                      className="text-gray-400 hover:text-red-500"
+                    >
+                      🗑
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {mobiles.length < 10 && (
+                <button
+                  type="button"
+                  onClick={handleAddMobile}
+                  className="text-blue-600 text-sm flex items-center gap-1 hover:underline mt-2"
+                >
+                  <span>➕</span> Add mobile
+                </button>
+              )}
+            </div>
+
+            <div className="pt-4 text-right">
+              <button
+                onClick={handleSubmit}
+                className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-full"
+              >
+                Submit →
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -196,56 +242,3 @@ const AddInviteModal: React.FC<Props> = ({ isOpen, onClose }) => {
 };
 
 export default AddInviteModal;
-
-
-
-
-global
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-/* Category button 3-line clamp effect */
-.category-item {
-  width: 200px;
-}
-.category-item p {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-}
-
-/* Small variant for category button */
-.category-item--sm {
-  width: 140px;
-}
-.category-item--sm svg {
-  width: 20px;
-  height: 20px;
-}
