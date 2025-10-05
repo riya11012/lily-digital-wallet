@@ -330,90 +330,103 @@ const WalletInvitesTable: React.FC<WalletInvitesTableProps> = ({ data = [], onRe
     <div className="w-full mt-5 px-6 md:px-10 py-4">
       {/* Table (Flat or Grouped) */}
     {!groupBy ? (
-  <div className="mb-4 border rounded-2xl overflow-hidden shadow-sm">
-    <div className="max-h-[400px] max-w-[1300px]  overflow-y-auto  ">
-      <table className="w-full text-base border-collapse">
-        {renderTableHeader()}
-        <tbody>{renderTableRows(filteredData)}</tbody>
-      </table>
-    </div>
-  </div>
-) : (
-  // ✅ new grouped table view
-  <div className="mb-4 border rounded-2xl overflow-hidden shadow-sm">
-    <div className="max-h-[600px] overflow-y-auto">
-      <table className="w-full text-base border-collapse">
-        {renderTableHeader()}
-      <tbody>
-  {Object.entries(groupedData ?? {}).map(([group, rows]) => (
-    <React.Fragment key={group}>
-      <tr className="bg-gray-100">
-        <td colSpan={9} className="px-4 py-3">
-          <button
-            onClick={() => toggleGroup(group)}
-            className="w-full flex rounded-2xl justify-between items-center bg-gray-200 px-4 py-3 text-left font-medium text-gray-700 hover:bg-gray-200"
-          >
-            <span>
-              {groupBy?.charAt(0).toUpperCase() + groupBy?.slice(1)}: {group} ({rows.length})
-            </span>
-            <span>{expandedGroups[group] ? '−' : '+'}</span>
-          </button>
-        </td>
-      </tr>
+      <div className="mb-4 border rounded-2xl overflow-hidden shadow-sm">
+        <div className="max-w-[1300px]">
+          {/* Header table (no scroll) */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-base border-collapse table-fixed">
+              {renderTableHeader()}
+            </table>
+          </div>
+          {/* Scrollable body table */}
+          <div className="max-h-[250px] overflow-y-auto">
+            <table className="w-full text-base border-collapse table-fixed">
+              <tbody>{renderTableRows(filteredData)}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    ) : (
+      // ✅ grouped table view
+      <div className="mb-4 border rounded-2xl overflow-hidden shadow-sm">
+        {/* Header table (no scroll) */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-base border-collapse table-fixed">
+            {renderTableHeader()}
+          </table>
+        </div>
+        {/* Scrollable grouped body table */}
+        <div className="max-h-[400px] overflow-y-auto">
+          <table className="w-full text-base border-collapse table-fixed">
+            <tbody>
+              {Object.entries(groupedData ?? {}).map(([group, rows]) => (
+                <React.Fragment key={group}>
+                  <tr className="bg-gray-100">
+                    <td colSpan={9} className="px-4 py-3">
+                      <button
+                        onClick={() => toggleGroup(group)}
+                        className="w-full flex rounded-2xl justify-between items-center bg-gray-200 px-4 py-3 text-left font-medium text-gray-700 hover:bg-gray-200"
+                      >
+                        <span>
+                          {groupBy?.charAt(0).toUpperCase() + groupBy?.slice(1)}: {group} ({rows.length})
+                        </span>
+                        <span>{expandedGroups[group] ? '−' : '+'}</span>
+                      </button>
+                    </td>
+                  </tr>
 
-      {expandedGroups[group] && (
-        <>
-          {/* Table headers per group */}
-          <tr className="bg-gray-50 text-gray-700 font-semibold text-xs">
-            <td className="px-3 py-2">Clinical trial</td>
-            <td className="px-3 py-2">Language</td>
-            <td className="px-3 py-2">Mobile</td>
-            <td className="px-3 py-2">Country</td>
-            <td className="px-3 py-2">Card ID</td>
-            <td className="px-3 py-2">Request ID</td>
-            <td className="px-3 py-2">Sent date</td>
-            <td className="px-3 py-2">Status</td>
-            <td className="px-3 py-2"></td>
-          </tr>
+                  {expandedGroups[group] && (
+                    <>
+                      {/* Table headers per group */}
+                      <tr className="bg-gray-50 text-gray-700 font-semibold text-xs">
+                        <td className="px-3 py-2">Clinical trial</td>
+                        <td className="px-3 py-2">Language</td>
+                        <td className="px-3 py-2">Mobile</td>
+                        <td className="px-3 py-2">Country</td>
+                        <td className="px-3 py-2">Card ID</td>
+                        <td className="px-3 py-2">Request ID</td>
+                        <td className="px-3 py-2">Sent date</td>
+                        <td className="px-3 py-2">Status</td>
+                        <td className="px-3 py-2"></td>
+                      </tr>
 
-          {/* Table rows */}
-          {rows.map((row) => (
-            <tr key={row.id} className="border-b bg-white hover:bg-gray-50 text-xs">
-              <td className="px-3 py-2 max-w-[150px] whitespace-nowrap overflow-auto">{row.trial}</td>
-              <td className="px-3 py-2">{row.language}</td>
-              <td className="px-3 py-2">{row.mobile}</td>
-              <td className="px-3 py-2">{row.country}</td>
-              <td className="px-3 py-2">{row.cardId}</td>
-              <td className="px-3 py-2">{row.requestId}</td>
-              <td className="px-3 py-2">
-                {row.sentDate
-                  ? new Date(row.sentDate).toLocaleString('en-GB', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
-                  : '-'}
-              </td>
-              <td className="px-3 py-2">
-                <StatusBadge status={row.status} />
-              </td>
-              <td className="px-3 py-2">
-                <ResendButton status={row.status} onResend={() => onResend(row.id)} />
-              </td>
-            </tr>
-          ))}
-        </>
-      )}
-    </React.Fragment>
-  ))}
-</tbody>
-
-      </table>
-    </div>
-  </div>
-)}
+                      {/* Table rows */}
+                      {rows.map((row) => (
+                        <tr key={row.id} className="border-b bg-white hover:bg-gray-50 text-xs">
+                          <td className="px-3 py-2 max-w-[150px] whitespace-nowrap overflow-auto">{row.trial}</td>
+                          <td className="px-3 py-2">{row.language}</td>
+                          <td className="px-3 py-2">{row.mobile}</td>
+                          <td className="px-3 py-2">{row.country}</td>
+                          <td className="px-3 py-2">{row.cardId}</td>
+                          <td className="px-3 py-2">{row.requestId}</td>
+                          <td className="px-3 py-2">
+                            {row.sentDate
+                              ? new Date(row.sentDate).toLocaleString('en-GB', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                              : '-'}
+                          </td>
+                          <td className="px-3 py-2">
+                            <StatusBadge status={row.status} />
+                          </td>
+                          <td className="px-3 py-2">
+                            <ResendButton status={row.status} onResend={() => onResend(row.id)} />
+                          </td>
+                        </tr>
+                      ))}
+                    </>
+                  )}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )}
 
       
 
