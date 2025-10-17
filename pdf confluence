@@ -1,592 +1,370 @@
-Excellent 👍
-Here’s the **clean, well-formatted text version** of your **Lilly Digital Wallet (LDW) Solution Architecture Document**, keeping all original internal references and content intact, but rewritten for clarity, professional readability, and technical consistency.
-
----
-
-# **Lilly Digital Wallet (LDW) – Solution Architecture Document**
-
----
-
-## **1. Introduction**
-
-### **1.1 Overview**
-
-This document outlines the solution architecture for the **Lilly Digital Wallet (LDW)**. It defines the business architecture, business context, capabilities, and functional overview. Furthermore, it presents a comprehensive technical architecture covering architectural objectives, vision, conceptual and physical design, database design, security, and deployment strategy.
-
----
-
-## **2. Context**
-
-The **Lilly Digital Wallet (LDW)** aims to streamline copay card access and usage across **40 clinical trials**. The **LDW Portal** is used by **Lilly Study Coordinators (LSCs)** to send **Apple Pay and Google Pay cards** in multiple languages — *English, Spanish, and French (TBD)*.
-
----
-
-## **3. Abbreviations**
-
-| Acronym | Description                         |
-| ------- | ----------------------------------- |
-| LSC     | Lilly Study Coordinator             |
-| LSIC    | Lilly Site Coordinator              |
-| SA      | Super Admin                         |
-| LDW     | Lilly Digital Wallet                |
-| ABC     | Affordability Benefit Configuration |
-
-**Note:**
-The Lilly Digital Wallet **does not contain PHI** (Protected Health Information).
-
----
-
-## **4. References**
-
-* **High Fidelity Figma Wireframe:**
-  [Lilly Portal Wireframe](https://www.figma.com/design/Wc06Ms5fbVjYhGJy7NSJST/lilly-portal?node-id=0-1&p=f&t=qW84cJ32njjB2o8O-0)
-
-* **Bitbucket Repository:** *TBD*
-
-* **Azure DevOps Project:** *TBD*
-
----
-
-## **5. Business Architecture**
-
-### **5.1 Business Context**
-
-Digital copay cards stored in mobile wallets (Apple or Google Wallet) are more convenient, secure, and environmentally friendly compared to paper copay cards, which can be lost, damaged, or outdated. Most pharmacies accept both, but digital versions are faster and easily updated.
-
-### **5.2 Business Capability**
-
-* LSCs can send digital wallet invites to multiple participants at once (limit: 10) for a selected language and clinical trial.
-* They can view which phone numbers received the invite and the message delivery status.
-
----
-
-## **6. Process Flow**
-
-Typical business process in **Lilly Digital Wallet (LDW):**
-
-1. **LSC/LSIC** opens the **LDW Portal** via a web browser.
-2. Portal performs **authentication and authorization**.
-3. Upon successful login, LSC/LSIC can:
-
-   * Send copay cards to up to **10 patients’ mobile numbers**.
-   * Choose from **English, Spanish, or French** languages.
-4. The LDW Portal supports sending cards to **USA, Canada, and Puerto Rico** patients.
-
-*Reference: LDW-ProcessFlow.jpg*
-
----
-
-## **7. Functional Overview**
-
-| #     | Requirement Description                                                                                                                                                                                                                                                                                                          |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1** | Create Digital Wallets for all clinical trials (40). <br>• Setup Apple and Android templates on Airship. <br>• Setup ABC configuration.                                                                                                                                                                                          |
-| **2** | Create LDW Portal. <br>• User login with username and password. <br>• Super Admin manages Clinical Trials and Users. <br>• LSCs invite and manage LSICs. <br>• LSC/LSIC selects Clinical Trial, Country, and Language. <br>• LSC/LSIC sends copay cards to multiple patients. <br>• LSC/LSIC can view invite history and status. |
-
----
-
-## **8. Non-Functional Requirements**
-
-| #     | Requirement Description                  |
-| ----- | ---------------------------------------- |
-| **1** | Setup ABC configuration in LDW database. |
-| **2** | Setup transaction logs for LDW Portal.   |
-
----
-
-## **9. Architectural Analysis**
-
-The **LDW Portal** is a cloud-based web application designed for sending multiple copay cards and supporting multi-tenant architecture.
-
----
-
-## **10. Architecture Vision**
-
-A **cloud-hosted, scalable, and modular** platform aligned with Agile methodology for incremental feature delivery and deployment.
-
----
-
-## **11. Architecture Goals and Objectives**
-
-| Goal                  | Description                                                                   |
-| --------------------- | ----------------------------------------------------------------------------- |
-| **Scalability**       | Independent scaling for web and database tiers as trials increase.            |
-| **Performance**       | Fast response and optimized performance for LSC/LSIC users.                   |
-| **High Availability** | Support continuous, phased Agile releases.                                    |
-| **Observability**     | Implement application logging and tracing using AWS CloudWatch and APM tools. |
-
----
-
-## **12. Architecture Constraints**
-
-| Constraint          | Description                                                                           |
-| ------------------- | ------------------------------------------------------------------------------------- |
-| **Portability**     | Use **Java (Spring Boot)** packaged in Docker containers for cross-cloud portability. |
-| **Maintainability** | Align with **Eversana skillset** — use **ReactJS** and **PostgreSQL**.                |
-
----
-
-## **13. Architecture Decisions**
-
-| Decision                     | Context                                                                                                    | Consequences                                                                                  |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| **Containerize Application** | Build Spring Boot services, package in Docker, and host on AWS ECS instead of Lambda or Elastic Beanstalk. | **Pros:** Portable, scalable. <br> **Cons:** Requires ECS provisioning and management effort. |
-
----
-
-## **14. Conceptual Architecture**
-
-### **14.1 System Overview**
-
-Refer to **LDW-Design.jpg** for high-level architecture.
-
----
-
-### **14.2 Solution Layers**
-
-| Layer                    | Description                                | Components                     |
-| ------------------------ | ------------------------------------------ | ------------------------------ |
-| **Presentation Layer**   | User interface and experience.             | ReactJS                        |
-| **Business Logic Layer** | Core application rules and logic.          | TypeScript                     |
-| **Database Layer**       | Store LDW configuration and invite data.   | PostgreSQL                     |
-| **Security Layer**       | Authentication via Lilly SSO and HTTPS.    | SSO, Client ID/Secret, ABC API |
-| **Monitoring & Logging** | Track application transactions and errors. | AWS CloudWatch Logs            |
-
----
-
-## **15. Key Technical Components**
-
-| Component                          | Description                                           |
-| ---------------------------------- | ----------------------------------------------------- |
-| **LDW Portal**                     | Web frontend built with ReactJS.                      |
-| **Digital Wallet Integration**     | Integration with ABC API (Phoenix Technology).        |
-| **Tactics (Templates) in Airship** | Template management for Apple/Android Wallet invites. |
-| **ABC Configuration**              | TBD (Affordability Benefit Configuration setup).      |
-
----
-
-## **16. Component Design**
-
-### **16.1 Portal Design**
-
-* Reference Wireframe: [Figma Design Link](https://www.figma.com/design/Wc06Ms5fbVjYhGJy7NSJST/lilly-portal?node-id=0-1&p=f)
-* Client approval pending; finalized wireframes to be updated post-approval.
-
----
-
-## **17. Access Management**
-
-### **17.1 User Roles**
-
-| Role                        | Description                                                | Key Features                                                       |
-| --------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------ |
-| **Super Admin (SA)**        | Oversees the system and manages all users and permissions. | Manage users, roles, trials, system configuration, and audit logs. |
-| **Study Coordinator (LSC)** | Manages LSIC invites and wallet distribution.              | Invite LSICs, send wallet invites, manage trials.                  |
-| **Site Coordinator (LSIC)** | Manages wallet invites only.                               | Send digital wallet invites.                                       |
-
----
-
-## **18. Design Flow**
-
-The following outlines role-based portal behavior:
-
----
-
-### **18.1 Super Admin Flow**
-
-**Login Page**
-
-* Authenticate via username/password.
-* Error message: *“The username and password you provided did not match our records.”*
-* Forgot Password: Password reset flow via email.
-
-**Users Page (Home)**
-
-* Displays users grouped by **Clinical Trial**.
-* Actions: *Edit, Remove from Trial, Delete* (only for Active users).
-* **Add User Dialog:** Search existing users or create new (First/Last Name, Email, Role, Trials).
-* On submission, sends activation link and updates invite status.
-* Edit or remove trials; deactivate users by setting status to *Inactive*.
-
-**Manage Trials Page**
-
-* Add/Edit/Deactivate clinical trials.
-* Fields: *Trial Code, Disease State, Country, Language, Start/End Date*.
-* Add/Edit dialogs with validation and dropdown dependencies.
-
----
-
-### **18.2 Study Coordinator (LSC) Flow**
-
-**Login Page**
-
-* Same authentication and password reset as SA.
-
-**Wallet Invites Page**
-
-* Displays invite history sorted by *record_date (DESC)*.
-* Group and filter options by *Trial, Country, Language*.
-* **Add Invite Dialog:**
-
-  * Select *Trial, Country, Language*.
-  * Add up to **10 mobile numbers**.
-  * On Submit:
-
-    * Save to `invite_request` table.
-    * Call **ABC API** per mobile number.
-    * Store results in `invite_response` table.
-    * Display success notification.
-
-**Users Page**
-
-* Same user management as SA but limited to LSIC users within assigned trials.
-
----
-
-### **18.3 Site Coordinator (LSIC) Flow**
-
-**Login and Password Reset**
-
-* Same process as LSC.
-
-**Wallet Invites Page**
-
-* View and send wallet invites.
-* Filter/group by trial or country.
-* Add up to 10 mobile numbers per request.
-* API call and logging similar to LSC.
-
----
-
-## **19. Database and Integration Overview**
-
-| Table                   | Description                                         |
-| ----------------------- | --------------------------------------------------- |
-| **trial_configuration** | Stores trial, country, and language configurations. |
-| **invite_request**      | Tracks wallet invite requests.                      |
-| **invite_response**     | Stores ABC API responses per request.               |
-| **user**                | Stores LSC/LSIC details and status.                 |
-
-**Integrations:**
-
-* **ABC API:** To send digital wallet invites.
-* **Airship API:** For wallet template setup and push.
-* **Lilly SSO:** For user authentication.
-
----
-
-## **20. Security and Compliance**
-
-* **Authentication:** Lilly SSO with OAuth2.0.
-* **Authorization:** Role-based access (SA, LSC, LSIC).
-* **Data Transmission:** Enforced via HTTPS.
-* **Data Privacy:** No PHI data is stored or transmitted.
-
----
-
-## **21. Deployment Strategy**
-
-* **Containerization:** Dockerized services deployed on **AWS ECS**.
-* **CI/CD:** Managed via **Azure DevOps pipelines**.
-* **Database:** PostgreSQL on AWS RDS.
-* **Logging:** AWS CloudWatch for monitoring and alerting.
-
----
-
-## **22. Observability**
-
-* **Logging:** Application and API logs stored centrally in AWS CloudWatch.
-* **Tracing:** Integrated APM tools for transaction-level performance monitoring.
-* **Audit Trails:** Maintain system-level audit records for compliance.
-
----
-
-## **23. Future Enhancements**
-
-* Add French language support (Phase 2).
-* Integrate advanced analytics for invite tracking.
-* Enable dynamic trial onboarding via configuration service.
-
----
-
-✅ **Document Status:** Draft
-🗓️ **Last Updated:** October 2025
-📘 **Prepared By:** Eversana Technical Architecture Team
-
----
-
-Would you like me to now format this version into a **Word (.docx)** or **PDF** document with a cover page and table of contents for submission?
-Here’s your **Lilly Digital Wallet – Solution Architecture Document (Full Technical Version)**, fully cleaned, formatted, and structured for professional presentation or upload to Confluence / documentation repository.
-
----
-
-# **Lilly Digital Wallet – Solution Architecture Document**
-
----
-
-## **1. Overview**
-
-The **Lilly Digital Wallet (LDW)** is an established component designed to enable patient enrollment, copay card generation, and digital wallet management for various clinical programs. It integrates with internal systems and external APIs to provide a seamless patient experience and support for operational teams.
-
-The solution leverages modular design principles, scalable architecture, and secure integration patterns to ensure data integrity, compliance, and maintainability.
-
----
-
-## **2. Reference**
-
-**Document Reference:**
-Digital Wallet – *Gaurav Sharma – Confluence*
-
-**System Type:**
-Established Component (Integrated with ABC Copay Card API and LDW Portal)
-
----
-
-## **3. System Architecture Overview**
-
-The **Lilly Digital Wallet System** consists of several core layers and integration components:
-
-### **3.1 Core Components**
-
-* **LDW Portal (Frontend UI):**
-  User interface for managing trials, invites, and wallet information.
-* **LDW Backend Service (API Layer):**
-  Handles business logic, database operations, and communication with external APIs.
-* **Database:**
-  PostgreSQL database containing all configuration, user, and transaction data.
-* **External APIs:**
-  Integration with the **ABC Copay Card API** for copay card generation and delivery.
-
-### **3.2 Integration Flow (Figure 1)**
-
-1. User logs in to LDW Portal.
-2. Selects clinical trial and generates patient invites.
-3. LDW Backend invokes ABC API for copay card creation.
-4. API response (status, card info, PDF ID) stored in the `invite_response` table.
-5. User can monitor invite and card generation statuses from the LDW Portal.
-
----
-
-## **4. Data Architecture**
-
-The following tables form the data layer for the **Lilly Digital Wallet System**.
-
----
-
-### **4.1 Roles Table**
-
-**Table Name:** `roles`
-
-| Column Name  | Data Type   | Key         | Default / Notes                 |
-| ------------ | ----------- | ----------- | ------------------------------- |
-| record_id    | serial      | Primary Key | Auto Increment by 1             |
-| role_name    | varchar(20) |             | Not Null                        |
-| created_by   | varchar(20) |             | Not Null                        |
-| created_date | timestamptz |             | Not Null (record creation date) |
-| updated_by   | varchar(20) |             | Null                            |
-| updated_date | timestamptz |             | Null (record update date)       |
-
----
-
-### **4.2 User Login Table**
-
-**Table Name:** `users`
-
-| Column Name    | Data Type    | Key                   | Default / Notes            |
-| -------------- | ------------ | --------------------- | -------------------------- |
-| record_id      | bigserial    | Primary Key           | Auto Increment by 1        |
-| first_name     | varchar(50)  |                       | Null                       |
-| last_name      | varchar(50)  |                       | Null                       |
-| email_id       | varchar(100) |                       | Not Null                   |
-| password       | varchar(50)  |                       | Not Null                   |
-| role_record_id | serial       | Foreign Key → `roles` | Not Null                   |
-| status         | varchar(10)  |                       | Not Null (Default: Active) |
-| created_by     | varchar(20)  |                       | Not Null                   |
-| created_date   | timestamptz  |                       | Not Null                   |
-| updated_by     | varchar(20)  |                       | Null                       |
-| updated_date   | timestamptz  |                       | Null                       |
-
----
-
-### **4.3 Country & Language Table**
-
-**Table Name:** `country_language`
-
-| Column Name  | Data Type   | Key         | Default / Notes     |
-| ------------ | ----------- | ----------- | ------------------- |
-| record_id    | serial      | Primary Key | Auto Increment by 1 |
-| country_name | varchar(20) |             | Not Null            |
-| language     | varchar(20) |             | Not Null            |
-| created_by   | varchar(20) |             | Not Null            |
-| created_date | timestamptz |             | Not Null            |
-| updated_by   | varchar(20) |             | Null                |
-| updated_date | timestamptz |             | Null                |
-
----
-
-### **4.4 Trial Configuration Table**
-
-**Table Name:** `trials`
-
-| Column Name                | Data Type   | Key                              | Default / Notes            |
-| -------------------------- | ----------- | -------------------------------- | -------------------------- |
-| record_id                  | serial      | Primary Key                      | Auto Increment by 1        |
-| trial_code                 | varchar(36) |                                  | Not Null                   |
-| trial_name                 | varchar(50) |                                  | Not Null                   |
-| country_language_record_id | serial      | Foreign Key → `country_language` | Not Null                   |
-| status                     | varchar(10) |                                  | Not Null (Default: Active) |
-| created_by                 | varchar(20) |                                  | Not Null                   |
-| created_date               | timestamptz |                                  | Not Null                   |
-| updated_by                 | varchar(20) |                                  | Null                       |
-| updated_date               | timestamptz |                                  | Null                       |
-
----
-
-### **4.5 User Trials Table**
-
-**Table Name:** `user_trials`
-
-| Column Name     | Data Type   | Key                    | Default / Notes                          |
-| --------------- | ----------- | ---------------------- | ---------------------------------------- |
-| record_id       | serial      | Primary Key            | Auto Increment by 1                      |
-| user_record_id  | serial      | Foreign Key → `users`  | Not Null                                 |
-| trial_record_id | varchar(36) | Foreign Key → `trials` | Not Null                                 |
-| start_date      | timestamptz |                        | Not Null                                 |
-| end_date        | timestamptz |                        | Not Null                                 |
-| status          | varchar(10) |                        | Not Null (Default: Active)               |
-| invited_by      | serial      |                        | Not Null (user record ID of the inviter) |
-| created_by      | varchar(20) |                        | Not Null                                 |
-| created_date    | timestamptz |                        | Not Null                                 |
-| updated_by      | varchar(20) |                        | Null                                     |
-| updated_date    | timestamptz |                        | Null                                     |
-
----
-
-### **4.6 Invites Request Table**
-
-**Table Name:** `invite_request`
-
-| Column Name     | Data Type   | Key                               | Default / Notes                                         |
-| --------------- | ----------- | --------------------------------- | ------------------------------------------------------- |
-| record_id       | serial      | Primary Key                       | Auto Increment by 1                                     |
-| trial_record_id | integer     | Foreign Key → `trials(record_id)` | Not Null                                                |
-| mobile_numbers  | varchar(n)  |                                   | Not Null (Comma-separated: e.g., 5843432322,5853049345) |
-| created_by      | varchar(20) |                                   | Not Null                                                |
-| created_date    | timestamptz |                                   | Not Null                                                |
-| updated_by      | varchar(20) |                                   | Null                                                    |
-| updated_date    | timestamptz |                                   | Null                                                    |
-
----
-
-### **4.7 Invites Response Table**
-
-**Table Name:** `invite_response`
-
-| Column Name                | Data Type   | Key                                       | Default / Notes     |
-| -------------------------- | ----------- | ----------------------------------------- | ------------------- |
-| record_id                  | bigserial   | Primary Key                               | Auto Increment by 1 |
-| invite_record_id           | integer     | Foreign Key → `invite_request(record_id)` | Not Null            |
-| correlation_id             | varchar(36) |                                           | Null                |
-| group_code                 | varchar(36) |                                           | Null                |
-| client_code                | varchar(20) |                                           | Null                |
-| BIN                        | varchar(20) |                                           | Null                |
-| PCN                        | varchar(20) |                                           | Null                |
-| program_code               | varchar(50) |                                           | Null                |
-| copay_card_id              | varchar(50) |                                           | Null                |
-| http_status_code           | integer     |                                           | Not Null            |
-| status                     | varchar(15) |                                           | Not Null            |
-| status_description         | varchar(n)  |                                           | Null                |
-| pdf_document_id            | varchar(36) |                                           | Null                |
-| error_type                 | varchar(50) |                                           | Null                |
-| error_description          | varchar(n)  |                                           | Null                |
-| application_status_message | varchar(n)  |                                           | Null                |
-| record_date                | timestamptz |                                           | Not Null            |
-
----
-
-### **4.8 Transaction Log Table**
-
-**Table Name:** `transaction_log`
-
-| Column Name | Data Type   | Key         | Default / Notes     |
-| ----------- | ----------- | ----------- | ------------------- |
-| record_id   | bigserial   | Primary Key | Auto Increment by 1 |
-| log_type    | varchar(10) |             | Not Null            |
-| description | varchar(n)  |             | Not Null            |
-| record_date | timestamptz |             | Not Null            |
-
-**Log Type Description:**
-
-| Type     | Description           |
-| -------- | --------------------- |
-| Portal   | UI-related logs       |
-| API      | ABC API-related logs  |
-| Database | Database-related logs |
-
----
-
-## **5. Database Backup**
-
-A complete **database snapshot** must be taken **every 14 days** to ensure data recovery and integrity.
-Backups are to be securely stored in the cloud with restricted access and encrypted at rest.
-
----
-
-## **6. Integration and Interfaces**
-
-The **LDW Portal** communicates with the **ABC API (Copay Card API)** to generate copay cards and send them to the patient’s mobile number.
-All request and response logs are stored in the database for auditing.
-
----
-
-## **7. API Specification**
-
-**Endpoint:**
-`POST https://{hostName}/copay/exp/v1/copay/cards`
-
-**Request Headers:**
-
-```json
-{
-  "Content-Type": "application/json",
-  "Authorization": "Bearer <token>"
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { ArrowLeft, User, Mail, Shield, Plus, X } from 'lucide-react'
+import { isAuthenticated, getUserRole, isSuperAdmin } from '@/lib/userUtils'
+
+interface NewUser {
+  firstName: string
+  lastName: string
+  email: string
+  role: string
+  clinicalTrial: string
 }
-```
 
-**Request Body Example:**
-
-```json
-{
-  "patientId": "12345",
-  "trialCode": "TRIAL01",
-  "country": "US",
-  "language": "EN",
-  "mobileNumber": "9876543210"
+interface FormErrors {
+  [key: string]: string
 }
-```
 
-**Response Example:**
+export default function AddUserPage() {
+  const [newUser, setNewUser] = useState<NewUser>({
+    firstName: '',
+    lastName: '',
+    email: '',
+    role: '',
+    clinicalTrial: ''
+  })
+  const [formErrors, setFormErrors] = useState<FormErrors>({})
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
+  const [mounted, setMounted] = useState<boolean>(false)
+  const [availableTrials, setAvailableTrials] = useState<string[]>([
+    'Clinical Trial 1',
+    'Clinical Trial 2'
+  ])
+  const [newTrialName, setNewTrialName] = useState<string>('')
+  const [showAddTrialInput, setShowAddTrialInput] = useState<boolean>(false)
+  const router = useRouter()
 
-```json
-{
-  "status": "Success",
-  "copayCardId": "ABC123456789",
-  "pdfDocumentId": "PDF1234",
-  "statusCode": 200,
-  "message": "Copay card successfully generated."
+  useEffect(() => {
+    setMounted(true)
+    
+    // Check authentication
+    if (!isAuthenticated()) {
+      router.push('/login')
+      return
+    }
+
+    // Check if user has permission to add users
+    if (!isSuperAdmin()) {
+      router.push('/dashboard')
+      return
+    }
+  }, [router])
+
+  const validateForm = () => {
+    const errors: FormErrors = {}
+    
+    if (!newUser.firstName.trim()) {
+      errors.firstName = 'First name is required'
+    }
+    
+    if (!newUser.lastName.trim()) {
+      errors.lastName = 'Last name is required'
+    }
+    
+    if (!newUser.email.trim()) {
+      errors.email = 'Email is required'
+    } else if (!/\S+@\S+\.\S+/.test(newUser.email)) {
+      errors.email = 'Email is invalid'
+    }
+    
+    if (!newUser.role) {
+      errors.role = 'Role is required'
+    }
+    
+    if (!newUser.clinicalTrial) {
+      errors.clinicalTrial = 'Clinical trial is required'
+    }
+    
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!validateForm()) {
+      return
+    }
+
+    setIsSubmitting(true)
+    
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      console.log('Successfully added new user:', newUser)
+      alert(`User ${newUser.firstName} ${newUser.lastName} has been added successfully!`)
+      
+      // Reset form
+      setNewUser({
+        firstName: '',
+        lastName: '',
+        email: '',
+        role: '',
+        clinicalTrial: ''
+      })
+      
+      // Redirect back to dashboard
+      router.push('/dashboard')
+    } catch (error) {
+      console.error('Error adding user:', error)
+      alert('Failed to add user. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleAddTrial = () => {
+    setShowAddTrialInput(true)
+  }
+
+  const handleSaveNewTrial = () => {
+    if (newTrialName.trim()) {
+      const trialName = newTrialName.trim()
+      if (!availableTrials.includes(trialName)) {
+        setAvailableTrials([...availableTrials, trialName])
+        setNewUser({...newUser, clinicalTrial: trialName})
+        console.log('Added new trial:', trialName)
+      }
+      setNewTrialName('')
+      setShowAddTrialInput(false)
+    }
+  }
+
+  const handleCancelAddTrial = () => {
+    setNewTrialName('')
+    setShowAddTrialInput(false)
+  }
+
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100 py-8">
+      <div className="max-w-2xl mx-auto px-4">
+        {/* Header */}
+        <div className="mb-8">
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </button>
+          <h1 className="text-3xl font-bold text-gray-900">Add New User</h1>
+          <p className="text-gray-600 mt-2">Create a new user account for the system</p>
+        </div>
+
+        {/* Form Card */}
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+          <form onSubmit={handleSubmit} className="p-8">
+            {/* First Name */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <User className="inline h-4 w-4 mr-1" />
+                First Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={newUser.firstName}
+                onChange={(e) => {
+                  setNewUser({...newUser, firstName: e.target.value})
+                  if (formErrors.firstName) {
+                    setFormErrors({...formErrors, firstName: ''})
+                  }
+                }}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                  formErrors.firstName ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="Enter first name"
+              />
+              {formErrors.firstName && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.firstName}</p>
+              )}
+            </div>
+
+            {/* Last Name */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <User className="inline h-4 w-4 mr-1" />
+                Last Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={newUser.lastName}
+                onChange={(e) => {
+                  setNewUser({...newUser, lastName: e.target.value})
+                  if (formErrors.lastName) {
+                    setFormErrors({...formErrors, lastName: ''})
+                  }
+                }}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                  formErrors.lastName ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="Enter last name"
+              />
+              {formErrors.lastName && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.lastName}</p>
+              )}
+            </div>
+
+            {/* Email */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Mail className="inline h-4 w-4 mr-1" />
+                Email Address <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                value={newUser.email}
+                onChange={(e) => {
+                  setNewUser({...newUser, email: e.target.value})
+                  if (formErrors.email) {
+                    setFormErrors({...formErrors, email: ''})
+                  }
+                }}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                  formErrors.email ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="Enter email address"
+              />
+              {formErrors.email && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.email}</p>
+              )}
+            </div>
+
+            {/* Role */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Shield className="inline h-4 w-4 mr-1" />
+                Role <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={newUser.role}
+                onChange={(e) => {
+                  setNewUser({...newUser, role: e.target.value})
+                  if (formErrors.role) {
+                    setFormErrors({...formErrors, role: ''})
+                  }
+                }}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                  formErrors.role ? 'border-red-500' : 'border-gray-300'
+                }`}
+              >
+                <option value="">Select a role</option>
+                <option value="Study Coord.">Study Coordinator</option>
+                <option value="Site Coord.">Site Coordinator</option>
+                <option value="Admin">Admin</option>
+                <option value="User">User</option>
+              </select>
+              {formErrors.role && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.role}</p>
+              )}
+            </div>
+
+            {/* Clinical Trial */}
+            <div className="mb-8">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Clinical Trial <span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={newUser.clinicalTrial}
+                  onChange={(e) => {
+                    setNewUser({...newUser, clinicalTrial: e.target.value})
+                    if (formErrors.clinicalTrial) {
+                      setFormErrors({...formErrors, clinicalTrial: ''})
+                    }
+                  }}
+                  className={`flex-1 px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                    formErrors.clinicalTrial ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                >
+                  <option value="">Select a clinical trial</option>
+                  {availableTrials.map((trial) => (
+                    <option key={trial} value={trial}>
+                      {trial}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleAddTrial}
+                  className="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+              
+              {showAddTrialInput && (
+                <div className="mt-3 flex gap-2">
+                  <input
+                    type="text"
+                    value={newTrialName}
+                    onChange={(e) => setNewTrialName(e.target.value)}
+                    placeholder="Enter new trial name"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveNewTrial}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelAddTrial}
+                    className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+              
+              {formErrors.clinicalTrial && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.clinicalTrial}</p>
+              )}
+            </div>
+
+            {/* Submit Buttons */}
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={() => router.push('/dashboard')}
+                className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium flex items-center justify-center"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Adding User...
+                  </>
+                ) : (
+                  'Add User'
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  )
 }
-```
-
-**Error Response Example:**
-
-```json
-{
-  "status": "Failed",
-  "errorType": "ValidationError",
-  "errorDescription": "Invalid trial code or mobile number.",
-  "statusCode": 400
-}
-```
-
-
----
