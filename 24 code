@@ -1,185 +1,48 @@
 'use client'
 
-import { useState } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
+import { Phone, Clock } from 'lucide-react'
 
-export default function ProfilePage() {
-  const { user, updateProfile } = useAuth()
-
-
-  const [currentPassword, setCurrentPassword] = useState<string>('')
-  const [newPassword, setNewPassword] = useState<string>('')
-  const [retypePassword, setRetypePassword] = useState<string>('')
-
-  const [showCurrent, setShowCurrent] = useState<boolean>(false)
-  const [showNew, setShowNew] = useState<boolean>(false)
-  const [showRetype, setShowRetype] = useState<boolean>(false)
-
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [submitting, setSubmitting] = useState<boolean>(false)
-  const [success, setSuccess] = useState<string>('')
-  const [failure, setFailure] = useState<string>('')
-
-  const validatePassword = (password: string) => {
-    const minLength = password.length >= 8
-    const hasLetter = /[a-zA-Z]/.test(password)
-    const hasNumber = /\d/.test(password)
-    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password)
-    return minLength && hasLetter && hasNumber && hasSpecial
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setErrors({})
-    setSuccess('')
-    setFailure('')
-
-    const newErrors: Record<string, string> = {}
-
-    if (newPassword || retypePassword || currentPassword) {
-      if (!currentPassword) newErrors.currentPassword = 'Enter current password'
-      if (!validatePassword(newPassword)) {
-        newErrors.newPassword = 'Min 8 chars, include letters, numbers, special'
-      }
-      if (newPassword !== retypePassword) {
-        newErrors.retypePassword = "Passwords don't match"
-      }
-    }
-
-    if (Object.keys(newErrors).length) {
-      setErrors(newErrors)
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      let passwordOk = true
-      if (newPassword && currentPassword) {
-        // Stub: implement API when backend route exists
-        const resp = await fetch('/api/auth/change-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ currentPassword, newPassword }),
-        })
-        passwordOk = resp.ok
-        if (!passwordOk) {
-          const data = await resp.json().catch(() => ({}))
-          setFailure(data?.error || 'Failed to change password')
-        }
-      }
-
-      if (passwordOk) {
-        setSuccess('Password updated')
-        setCurrentPassword('')
-        setNewPassword('')
-        setRetypePassword('')
-      }
-    } catch (err) {
-      setFailure('Something went wrong')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
+export default function SupportPage() {
   return (
-    <div className="flex items-center justify-center min-h-screen px-2 py-2">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-3xl p-4">
-        <h1 className="text-xl font-normal text-black mb-4">Profile</h1>
+    <div className="min-h-screen p-8">
+      {/* Title */}
+      <h1 className="text-3xl font-normal text-black mb-2">
+        Portal Support and Pharmacy Help Desk
+      </h1>
+      
+      {/* Subtitle */}
+      <p className="text-lg text-black mb-8">
+        (Operate by EVERSANA Life Science Services, LLC)
+      </p>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Left: Your information */}
-          <div className="space-y-2">
-            <h2 className="text-sm font-semibold text-red-600">Your information</h2>
-            <div className="space-y-1">
-              <div className="text-base font-bold text-black">
-                {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : 'Craig Johnston'}
-              </div>
-              <div className="text-sm text-black">
-                {user?.email || 'craig.johnston@eversana.com'}
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Change password */}
-          <div className="space-y-2">
-            <h2 className="text-sm font-semibold text-red-600">Confirm Password</h2>
-            <div>
-              <label className="block text-sm font-bold text-black mb-2">Current Password</label>
-              <div className="relative">
-                <input
-                  type={showCurrent ? 'text' : 'password'}
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${errors.currentPassword ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="Enter current password"
-                />
-                <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
-                  {showCurrent ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-              {errors.currentPassword && <p className="text-red-500 text-sm mt-1">{errors.currentPassword}</p>}
-            </div>
-
-            <h2 className="text-sm font-semibold text-red-600 mt-3">Change password</h2>
-
-            <div>
-              <label className="block text-sm font-bold text-black mb-2">New Password</label>
-              <div className="relative">
-                <input
-                  type={showNew ? 'text' : 'password'}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${errors.newPassword ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="Enter new password"
-                />
-                <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
-                  {showNew ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-              {errors.newPassword && <p className="text-red-500 text-sm mt-1">{errors.newPassword}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-black mb-2">Retype Password</label>
-              <div className="relative">
-                <input
-                  type={showRetype ? 'text' : 'password'}
-                  value={retypePassword}
-                  onChange={(e) => setRetypePassword(e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${errors.retypePassword ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="Retype new password"
-                />
-                <button type="button" onClick={() => setShowRetype(!showRetype)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
-                  {showRetype ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-              {errors.retypePassword && <p className="text-red-500 text-sm mt-1">{errors.retypePassword}</p>}
-            </div>
-
-            <p className="text-sm text-gray-600">Your password should be at least 8 characters long and include a mix of letters, numbers, and special characters (like !, $, or #).</p>
-          </div>
+      {/* Phone Line Section */}
+      <div className="flex items-start gap-4 mb-6">
+        <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center flex-shrink-0">
+          <Phone className="w-6 h-6 text-white" />
         </div>
+        <div>
+          <h2 className="text-lg font-bold text-black mb-1">Phone Line</h2>
+          <p className="text-base text-black mb-2">
+            Lilly Clinical Trial Support Center Phone Line (Operated by EVERSANA)
+          </p>
+          <p className="text-xl font-bold text-black">
+            1-866-777-5704
+          </p>
+        </div>
+      </div>
 
-        {(success || failure) && (
-          <div className={`mt-6 p-3 rounded ${success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-            {success || failure}
-          </div>
-        )}
-
-        <div className="flex justify-end mt-6">
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className={`bg-gray-200 text-black px-6 py-3 rounded-full flex items-center gap-2 ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            submit
-            <span className="ml-1">›</span>
-          </button>
+      {/* Hours Section */}
+      <div className="flex items-start gap-4">
+        <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center flex-shrink-0">
+          <Clock className="w-6 h-6 text-white" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-black mb-1">Hours</h2>
+          <p className="text-base text-black">
+            Monday - Friday, 8:00am - 8:00pm ET
+          </p>
         </div>
       </div>
     </div>
   )
 }
-
-
