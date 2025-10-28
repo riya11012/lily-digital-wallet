@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Search, Plus, ChevronDown, MoreVertical, X } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { X, Calendar, ChevronDown } from 'lucide-react'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 
@@ -18,12 +18,13 @@ interface ClinicalTrial {
   sites: number
 }
 
-const clinicalTrials: ClinicalTrial[] = [
+// Mock data for existing clinical trials
+const existingClinicalTrials: ClinicalTrial[] = [
   {
     id: '1',
-    name: 'GIDF',
+    name: 'GSXK Diabetes Study',
     status: 'Active',
-    phase: 'Diabetes',
+    phase: 'Phase III',
     participants: 150,
     startDate: '15/01/2024',
     endDate: '15/12/2024',
@@ -32,9 +33,9 @@ const clinicalTrials: ClinicalTrial[] = [
   },
   {
     id: '2',
-    name: 'GIDI',
+    name: 'GKR4 Oncology Trial',
     status: 'Active',
-    phase: 'Diabetes',
+    phase: 'Phase II',
     participants: 85,
     startDate: '20/02/2024',
     endDate: '20/11/2024',
@@ -43,388 +44,431 @@ const clinicalTrials: ClinicalTrial[] = [
   },
   {
     id: '3',
-    name: 'GN01',
+    name: 'GYDG Cardiovascular Study',
     status: 'Inactive',
-    phase: 'Diabetes',
+    phase: 'Phase III',
     participants: 200,
     startDate: '10/03/2023',
     endDate: '10/12/2023',
     principalInvestigator: 'Dr. Emily Rodriguez',
     sites: 15
-  },
-  {
-    id: '4',
-    name: 'GX7D',
-    status: 'Active',
-    phase: 'Diabetes ',
-    participants: 45,
-    startDate: '05/05/2024',
-    endDate: '05/12/2024',
-    principalInvestigator: 'Dr. David Wilson',
-    sites: 5
-  },
-  {
-    id: '5',
-    name: 'GZ9K',
-    status: 'Inactive',
-    phase: 'Diabetes',
-    participants: 120,
-    startDate: '01/01/2023',
-    endDate: '01/06/2024',
-    principalInvestigator: 'Dr. Robert Taylor',
-    sites: 6
   }
 ]
 
-export default function ClinicalTrialsPage() {
+export default function AddClinicalTrialPage() {
   const router = useRouter()
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [phaseFilter, setPhaseFilter] = useState('')
-  const [fromDate, setFromDate] = useState<Date | null>(null)
-  const [toDate, setToDate] = useState<Date | null>(null)
-  const [showDropdown, setShowDropdown] = useState<string | null>(null)
-  const [showDeactivateModal, setShowDeactivateModal] = useState<boolean>(false)
-  const [trialToDeactivate, setTrialToDeactivate] = useState<ClinicalTrial | null>(null)
-  const [trials, setTrials] = useState<ClinicalTrial[]>(clinicalTrials)
-
-  const handleTrialAction = (trial: ClinicalTrial, event: React.MouseEvent) => {
-    event.stopPropagation()
-    setShowDropdown(showDropdown === trial.id ? null : trial.id)
-  }
-
-  const handleEditTrial = (trial: ClinicalTrial) => {
-    console.log('Edit Trial button clicked, navigating to /add-clinical-trial?edit=' + trial.id)
-    router.push(`/add-clinical-trial?edit=${trial.id}`)
-    setShowDropdown(null)
-  }
-
-  const closeDropdown = () => setShowDropdown(null)
-
-  const handleDeactivateTrial = (trial: ClinicalTrial) => {
-    setTrialToDeactivate(trial)
-    setShowDeactivateModal(true)
-    setShowDropdown(null)
-  }
-
-  const confirmDeactivate = () => {
-    if (trialToDeactivate) {
-      setTrials(prevTrials => 
-        prevTrials.map(trial => 
-          trial.id === trialToDeactivate.id 
-            ? { ...trial, status: 'Inactive' as const }
-            : trial
-        )
-      )
-      setShowDeactivateModal(false)
-      setTrialToDeactivate(null)
-    }
-  }
-
-  const cancelDeactivate = () => {
-    setShowDeactivateModal(false)
-    setTrialToDeactivate(null)
-  }
-
-  const parseDate = (dateStr: string): Date | null => {
-    if (!dateStr) return null;
-    // Parse dd/MM/yyyy format
-    const parts = dateStr.split('/').map(Number);
-    if (parts.length === 3) {
-      const [day, month, year] = parts;
-      if (day && month && year) {
-        const d = new Date(year, month - 1, day);
-        if (!isNaN(d.getTime())) return d;
-      }
-    }
-    return null;
-  };
-
-
-  const filteredTrials = trials.filter(trial => {
-    const searchLower = search.toLowerCase()
-    // Default to display fallbacks when fields are missing so search still works
-    const countryList = ((trial as any).countryRegion ?? ['US', 'PR']) as string[]
-    const languageList = ((trial as any).language ?? ['EN', 'ES']) as string[]
-    const haystack = [
-      trial.name,
-      trial.principalInvestigator,
-      trial.phase,
-      trial.status,
-      countryList.join(', '),
-      languageList.join(', ')
-    ]
-      .filter(Boolean)
-      .map(v => String(v).toLowerCase())
-
-    if (search && !haystack.some(v => v.includes(searchLower))) {
-      return false
-    }
-    if (statusFilter && trial.status !== statusFilter) {
-      return false
-    }
-    if (phaseFilter && !trial.name.toLowerCase().includes(phaseFilter.toLowerCase())) {
-      return false
-    }
-    
-    // Date filtering
-    if (fromDate || toDate) {
-      const trialStartDate = parseDate(trial.startDate);
-      if (trialStartDate) {
-        if (fromDate && trialStartDate < fromDate) return false;
-        if (toDate && trialStartDate > toDate) return false;
-      } else {
-        return false;
-      }
-    }
-    
-    return true
+  const searchParams = useSearchParams()
+  const editId = searchParams.get('edit')
+  
+  const [isEditing, setIsEditing] = useState(false)
+  const [formData, setFormData] = useState({
+    trialCode: '',
+    diseaseState: '',
+    countryRegion: [] as string[],
+    language: [] as string[],
+    startDate: null as Date | null,
+    endDate: null as Date | null
   })
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false)
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const countryRef = useRef<HTMLDivElement>(null)
+  const languageRef = useRef<HTMLDivElement>(null)
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Active': return 'bg-green-100 text-green-800'
-      case 'Inactive': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
+  // Load trial data when editing
+  useEffect(() => {
+    if (editId) {
+      const trial = existingClinicalTrials.find(t => t.id === editId)
+      if (trial) {
+        // Parse dates from DD/MM/YYYY format
+        const parseDate = (dateStr: string): Date | null => {
+          if (!dateStr) return null;
+          const parts = dateStr.split('/').map(Number);
+          if (parts.length === 3) {
+            const [day, month, year] = parts;
+            if (day && month && year) {
+              const d = new Date(year, month - 1, day);
+              if (!isNaN(d.getTime())) return d;
+            }
+          }
+          return null;
+        };
+
+        setFormData({
+          trialCode: trial.name,
+          diseaseState: trial.phase,
+          countryRegion: ['US'], // Default for now
+          language: ['English'], // Default for now
+          startDate: parseDate(trial.startDate),
+          endDate: parseDate(trial.endDate)
+        })
+        setIsEditing(true)
+      }
     }
+  }, [editId])
+
+  const handleInputChange = (field: string, value: string | Date | null) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }))
   }
 
-  // Unique trial names for dropdown
-  const trialNames = Array.from(new Set(trials.map(t => t.name))).sort()
-
-  const clearFilters = () => {
-    setSearch('')
-    setStatusFilter('')
-    setPhaseFilter('')
-    setFromDate(null)
-    setToDate(null)
+  const handleMultiSelect = (field: 'countryRegion' | 'language', value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: prev[field].includes(value)
+        ? prev[field].filter(item => item !== value)
+        : [...prev[field], value]
+    }))
   }
+
+  const countryOptions = [
+    { value: 'US', label: 'United States (US)' },
+    { value: 'PR', label: 'Puerto Rico (PR)' },
+    { value: 'CA', label: 'Canada (CA)' },
+    { value: 'UK', label: 'United Kingdom (UK)' },
+    { value: 'DE', label: 'Germany (DE)' },
+    { value: 'FR', label: 'France (FR)' },
+    { value: 'AU', label: 'Australia (AU)' },
+    { value: 'JP', label: 'Japan (JP)' },
+    { value: 'IN', label: 'India (IN)' },
+    { value: 'BR', label: 'Brazil (BR)' },
+    { value: 'MX', label: 'Mexico (MX)' }
+  ]
+
+  const languageOptions = [
+    { value: 'EN', label: 'English (EN)' },
+    { value: 'ES', label: 'Español (ES)' },
+    { value: 'FR', label: 'Français (FR)' },
+    { value: 'DE', label: 'Deutsch (DE)' },
+    { value: 'IT', label: 'Italiano (IT)' },
+    { value: 'PT', label: 'Português (PT)' },
+    { value: 'JA', label: '日本語 (JA)' },
+    { value: 'KO', label: '한국어 (KO)' },
+    { value: 'ZH', label: '中文 (ZH)' },
+    { value: 'HI', label: 'हिन्दी (HI)' }
+  ]
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    console.log('Form submitted:', formData)
+    
+    // Format date helper
+    const formatDate = (date: Date): string => {
+      const day = String(date.getDate()).padStart(2, '0')
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const year = String(date.getFullYear())
+      return `${day}/${month}/${year}`
+    }
+    
+    // Create new trial object
+    const newTrial = {
+      id: isEditing ? editId! : String(Date.now()),
+      name: formData.trialCode,
+      status: 'Active' as 'Active' | 'Inactive',
+      phase: formData.diseaseState,
+      participants: Math.floor(Math.random() * 200) + 20,
+      startDate: formData.startDate ? formatDate(formData.startDate) : '',
+      endDate: formData.endDate ? formatDate(formData.endDate) : '',
+      principalInvestigator: 'Dr. TBD',
+      sites: Math.floor(Math.random() * 10) + 3,
+      countryRegion: formData.countryRegion,
+      language: formData.language
+    }
+    
+    // Get existing trials
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('clinicalTrials')
+      let existingTrials = stored ? JSON.parse(stored) : existingClinicalTrials
+      
+      // Add or update
+      if (isEditing) {
+        existingTrials = existingTrials.map((t: ClinicalTrial) => 
+          t.id === editId ? newTrial : t
+        )
+      } else {
+        existingTrials.push(newTrial)
+      }
+      
+      localStorage.setItem('clinicalTrials', JSON.stringify(existingTrials))
+    }
+    
+    // Show success modal
+    setShowSuccessModal(true)
+  }
+
+  const handleClose = () => {
+    router.push('/clinical-trials')
+  }
+
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false)
+    router.push('/clinical-trials')
+  }
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (countryRef.current && !countryRef.current.contains(event.target as Node)) {
+        setShowCountryDropdown(false)
+      }
+      if (languageRef.current && !languageRef.current.contains(event.target as Node)) {
+        setShowLanguageDropdown(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-3xl shadow-sm">
-          {/* Header */}
-          <div className="px-6 py-3 border-b bg-gray-100 border-gray-200 flex justify-between items-center rounded-t-3xl">
-            <h1 className="text-lg text-gray-900">Admin // Clinical Trials</h1>
-            <div className="flex items-center space-x-3">
-              <div className="relative">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 relative">
+        {/* Close Button */}
+        <button
+          onClick={handleClose}
+          className="absolute top-6 right-6 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
+        >
+          <X className="w-4 h-4 text-gray-600" />
+        </button>
+
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-gray-900">
+            {isEditing ? 'Edit Clinical Trial' : 'Add Clinical Trial'}
+          </h1>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Left Column */}
+            <div className="space-y-6">
+              {/* Trial Code */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Trial Code
+                </label>
                 <input
                   type="text"
-                  placeholder="Search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-70 pl-8 pr-20 py-2  border border-gray-300 rounded-3xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={formData.trialCode}
+                  onChange={(e) => handleInputChange('trialCode', e.target.value)}
+                  className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder=""
                 />
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
               </div>
-                  <button 
-                    onClick={() => router.push('/add-clinical-trial')}
-                    className="bg-[#007fb2] text-white px-3 py-2 rounded-3xl text-sm font-medium flex items-center space-x-1 hover:bg-blue-700"
+
+              {/* Country/Region */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Country/Region
+                </label>
+                <div className="relative" ref={countryRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowCountryDropdown(!showCountryDropdown)}                    className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between"
                   >
-                    <Plus className="h-3 w-3" />
-                    <span>Add Trial</span>
+                    <span className={formData.countryRegion.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
+                      {formData.countryRegion.length === 0 ? 'Select' : `${formData.countryRegion.length} selected`}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
                   </button>
+                  
+                  {showCountryDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                      {countryOptions.map((option) => (
+                        <label
+                          key={option.value}
+                          className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={formData.countryRegion.includes(option.value)}
+                            onChange={() => handleMultiSelect('countryRegion', option.value)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="ml-3 text-sm text-gray-700">{option.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Start Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Start date
+                </label>
+                <div className="relative">
+                  <DatePicker
+                    selected={formData.startDate}
+                    onChange={(date: Date | null) => handleInputChange('startDate', date)}
+                    placeholderText=""
+                    className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    dateFormat="dd/MM/yyyy"
+                  />
+                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              {/* Disease State */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Disease State
+                </label>
+                <input
+                  type="text"
+                  value={formData.diseaseState}
+                  onChange={(e) => handleInputChange('diseaseState', e.target.value)}
+                  className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder=""
+                />
+              </div>
+
+              {/* Language */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Language
+                </label>
+                <div className="relative" ref={languageRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                    className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between"
+                  >
+                    <span className={formData.language.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
+                      {formData.language.length === 0 ? 'Select' : `${formData.language.length} selected`}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                  </button>
+                  
+                  {showLanguageDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                      {languageOptions.map((option) => (
+                        <label
+                          key={option.value}
+                          className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={formData.language.includes(option.value)}
+                            onChange={() => handleMultiSelect('language', option.value)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="ml-3 text-sm text-gray-700">{option.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* End Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  End date
+                </label>
+                <div className="relative">
+                  <DatePicker
+                    selected={formData.endDate}
+                    onChange={(date: Date | null) => handleInputChange('endDate', date)}
+                    placeholderText=""
+                    className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    dateFormat="dd/MM/yyyy"
+                  />
+                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Filters */}
-          <div className="px-7 py-3 border-b border-gray-200 flex flex-wrap gap-3 items-center text-sm">
-            <span className="font-medium text-gray-700">FILTER</span>
-         
-            <select
-              value={phaseFilter}
-              onChange={(e) => setPhaseFilter(e.target.value)}
-              className="px-2 py-1 h-9 bg-gray-100 border border-gray-300 rounded-md text-sm"
+          {/* Submit Button */}
+          <div className="flex justify-end pt-6">
+            <button
+              type="submit"
+              className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg font-medium flex items-center space-x-2 transition-colors"
             >
-              <option value="">Trial Name</option>
-              {trialNames.map(name => (
-                <option key={name} value={name}>{name}</option>
-              ))}
-            </select>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2 py-1 h-9 bg-gray-100 border border-gray-300 rounded-md text-sm"
-            >
-              <option value="">Status</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-            {/* Date Filters */}
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-gray-700">DATE</span>
-              <DatePicker
-                selected={fromDate}
-                onChange={(date: Date | null) => setFromDate(date)}
-                placeholderText="From"
-                className="w-20 h-9 font-normal px-2 text-xs bg-white border rounded-xl"
-                dateFormat="dd/MM/yyyy"
-                popperPlacement="bottom-start"
-                popperClassName="z-50"
-                portalId="root-portal"
-              />
-              <DatePicker
-                selected={toDate}
-                onChange={(date: Date | null) => setToDate(date)}
-                placeholderText="To"
-                className="w-20 h-9 font-normal px-2 text-xs bg-white border rounded-xl"
-                dateFormat="dd/MM/yyyy"
-                popperPlacement="bottom-start"
-                popperClassName="z-50"
-                portalId="root-portal"
-              />
-            </div>
-            
-            {/* Clear Filters Button */}
-            {(search || statusFilter || phaseFilter || fromDate || toDate) && (
-              <button
-                onClick={clearFilters}
-                className="px-2 py-1 text-xs border rounded-full h-9 flex items-center justify-center"
-              >
-                ✕
-              </button>
-            )}
+              <span>Submit</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
           </div>
-
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="px-7 min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-7 py-2 text-left text-xs font-medium text-gray-500 uppercase">Trial Code</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Disease State</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Country/Region</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Languages</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Start Date</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">End Date</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase"></th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredTrials.map((trial) => (
-                  <tr key={trial.id} className="hover:bg-gray-50">
-                    <td className="px-7 py-2 text-sm font-medium text-gray-900">{trial.name}</td>
-                    <td className="px-3 py-2 text-sm text-gray-900">{trial.phase}</td>
-                    <td className="px-3 py-2 text-sm text-gray-900">
-                      {(trial as any).countryRegion ? (trial as any).countryRegion.join(', ') : 'US, PR'}
-                    </td>
-                    <td className="px-3 py-2 text-sm text-gray-900">
-                      {(trial as any).language ? (trial as any).language.join(', ') : 'EN, ES'}
-                    </td>
-                    <td className="px-3 py-2 flex items-center space-x-1">
-                      <div className={`w-2 h-2 rounded-full ${trial.status === 'Active' ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                      <span className="text-xs">{trial.status}</span>
-                    </td>
-                    <td className="px-3 py-2 text-sm text-gray-900">{trial.startDate}</td>
-                    <td className="px-3 py-2 text-sm text-gray-900">{trial.endDate}</td>
-                    <td className="px-3 py-2 relative">
-                      <button
-                        onClick={(e) => handleTrialAction(trial, e)}
-                        className="p-1 hover:bg-gray-100 rounded"
-                      >
-                        <MoreVertical className="h-3 w-3 text-gray-400" />
-                      </button>
-                      {showDropdown === trial.id && (
-                        <div className="absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg z-10 border text-xs">
-                          <button 
-                            onClick={() => handleEditTrial(trial)}
-                            className="block w-full text-left px-3 py-1 text-gray-700 hover:bg-gray-100"
-                          >
-                            Edit
-                          </button>
-                          <button 
-                            onClick={() => handleDeactivateTrial(trial)}
-                            className="block w-full text-left px-3 py-1 text-gray-700 hover:bg-gray-100"
-                          >
-                            Deactivate
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* No Results */}
-          {filteredTrials.length === 0 && (
-            <div className="text-center py-8">
-              <div className="text-gray-500 text-sm">No clinical trials found matching your criteria</div>
-            </div>
-          )}
-        </div>
+        </form>
       </div>
 
-      {/* Deactivate Confirmation Modal */}
-      {showDeactivateModal && trialToDeactivate && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Deactivate Clinical Trial</h2>
-              <button
-                onClick={cancelDeactivate}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <X className="h-5 w-5 text-gray-600" />
-              </button>
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative">
+            {/* Close Button */}
+            <button
+              onClick={handleSuccessModalClose}
+              className="absolute top-4 right-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
+            >
+              <X className="w-4 h-4 text-gray-600" />
+            </button>
+
+            {/* Header */}
+            <div className="mb-4">
+              <h2 className="text-xl font-bold text-gray-900">{isEditing ? 'Edit Clinical Trial' : 'Add Clinical Trial'}</h2>
             </div>
 
-            {/* Modal Content */}
-            <div className="p-6">
-              <div className="text-center mb-6">
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Are you sure?</h3>
-                <p className="text-sm text-gray-600">
-                  You are about to deactivate <strong>{trialToDeactivate.name}</strong>. 
-                  This action will change the trial status to Inactive.
+            <hr className="border-gray-200 mb-4" />
+
+            {/* Success Message */}
+            <div className="flex items-center justify-center mb-6">
+              <div className="bg-green-100 rounded-full p-2 mr-3">
+                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <p className="text-lg font-bold text-gray-900">{isEditing ? 'Clinical Trial has been edited' : 'Clinical Trial has been added'}</p>
+            </div>
+
+            <hr className="border-gray-200 mb-6" />
+
+            {/* Trial Details */}
+            <div className="grid grid-cols-2 gap-y-2 text-sm mb-6">
+              <div>
+                <p className="font-bold text-gray-900">{formData.trialCode || 'GSXL Diabetes'}</p>
+                <p className="text-gray-700">
+                  {formData.countryRegion.length > 0
+                    ? countryOptions.filter(opt => formData.countryRegion.includes(opt.value)).map(opt => opt.label.split(' ')[0]).join(', ')
+                    : 'United States'}
+                </p>
+                <p className="text-gray-700">
+                  {formData.language.length > 0
+                    ? languageOptions.filter(opt => formData.language.includes(opt.value)).map(opt => opt.label.split(' ')[0]).join(', ')
+                    : 'English, Español'}
                 </p>
               </div>
-
-              {/* Trial Details */}
-              <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-500">Trial Name:</span>
-                    <div className="font-medium text-gray-900">{trialToDeactivate.name}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Phase:</span>
-                    <div className="font-medium text-gray-900">{trialToDeactivate.phase}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Participants:</span>
-                    <div className="font-medium text-gray-900">{trialToDeactivate.participants}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Sites:</span>
-                    <div className="font-medium text-gray-900">{trialToDeactivate.sites}</div>
-                  </div>
-                </div>
+              <div className="text-right">
+                <p className="font-bold text-gray-900">
+                  Start Date: {formData.startDate ? formData.startDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '10/20/24'}
+                </p>
+                <p className="font-bold text-gray-900">
+                  End Date: {formData.endDate ? formData.endDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '9/30/26'}
+                </p>
               </div>
+            </div>
 
-              {/* Action Buttons */}
-              <div className="flex space-x-3">
-                <button
-                  onClick={cancelDeactivate}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDeactivate}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Deactivate Trial
-                </button>
-              </div>
+            {/* Close Button */}
+            <div className="flex justify-end">
+              <button
+                onClick={handleSuccessModalClose}
+                className="bg-red-600 text-white px-6 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 hover:bg-red-700 transition-colors"
+              >
+                <span>Close</span>
+                <X className="h-4 w-4" />
+              </button>
             </div>
           </div>
         </div>
