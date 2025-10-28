@@ -2,65 +2,202 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, ChevronDown, Plus, Trash2 } from 'lucide-react'
+import { Search, X, ChevronDown, Plus } from 'lucide-react'
+// Clinical trial users data from the Admin Users page
+const clinicalTrialUsers = [
+  // Clinical Trial 1 users
+  {
+    id: '1',
+    firstName: 'Audra',
+    lastName: 'Luettgen',
+    email: 'Audra.Luettgen@domain.ext',
+    status: 'Active',
+    role: 'Study Coord.',
+    startDate: '15/01/2024',
+    endDate: '15/12/2024',
+    trial: 'Clinical Trial 1'
+  },
+  {
+    id: '2',
+    firstName: 'Augustus',
+    lastName: 'Daugherty',
+    email: 'Augustus.Daugherty@domain.ext',
+    status: 'Active',
+    role: 'Site Coord.',
+    startDate: '20/02/2024',
+    endDate: '20/11/2024',
+    trial: 'Clinical Trial 1'
+  },
+  {
+    id: '3',
+    firstName: 'Dessie',
+    lastName: 'Grady',
+    email: 'Dessie.Grady@domain.ext',
+    status: 'Active',
+    role: 'Site Coord.',
+    startDate: '10/03/2024',
+    endDate: '10/10/2024',
+    trial: 'Clinical Trial 1'
+  },
+  {
+    id: '4',
+    firstName: 'Selina',
+    lastName: 'Abernathy',
+    email: 'Selina.Abernathy@domain.ext',
+    status: 'Active',
+    role: 'Site Coord.',
+    startDate: '05/04/2024',
+    endDate: '05/09/2024',
+    trial: 'Clinical Trial 1'
+  },
+  {
+    id: '5',
+    firstName: 'Lyda',
+    lastName: 'Gulgowski',
+    email: 'Lyda.Gulgowski@domain.ext',
+    status: 'Active',
+    role: 'Site Coord.',
+    startDate: '12/05/2024',
+    endDate: '12/08/2024',
+    trial: 'Clinical Trial 1'
+  },
+  {
+    id: '6',
+    firstName: 'Lola',
+    lastName: 'Rutherford',
+    email: 'Lola.Rutherford@domain.ext',
+    status: 'Inactive',
+    role: 'Site Coord.',
+    startDate: '01/06/2024',
+    endDate: '01/07/2024',
+    trial: 'Clinical Trial 1'
+  },
+  // Clinical Trial 2 users (20 records - adding some sample ones)
+  {
+    id: '7',
+    firstName: 'John',
+    lastName: 'Smith',
+    email: 'John.Smith@domain.ext',
+    status: 'Active',
+    role: 'Study Coord.',
+    startDate: '01/01/2024',
+    endDate: '31/12/2024',
+    trial: 'Clinical Trial 2'
+  },
+  {
+    id: '8',
+    firstName: 'Jane',
+    lastName: 'Doe',
+    email: 'Jane.Doe@domain.ext',
+    status: 'Active',
+    role: 'Site Coord.',
+    startDate: '15/02/2024',
+    endDate: '15/11/2024',
+    trial: 'Clinical Trial 2'
+  },
+  {
+    id: '9',
+    firstName: 'Bob',
+    lastName: 'Johnson',
+    email: 'Bob.Johnson@domain.ext',
+    status: 'Inactive',
+    role: 'Admin',
+    startDate: '01/03/2024',
+    endDate: '30/06/2024',
+    trial: 'Clinical Trial 2'
+  },
+  {
+    id: '10',
+    firstName: 'Alice',
+    lastName: 'Brown',
+    email: 'Alice.Brown@domain.ext',
+    status: 'Active',
+    role: 'User',
+    startDate: '10/04/2024',
+    endDate: '10/10/2024',
+    trial: 'Clinical Trial 2'
+  }
+]
 
-interface EditUser {
+interface NewUser {
   firstName: string
   lastName: string
   email: string
   role: string
-  clinicalTrials: string[]
+  clinicalTrial: string
 }
 
 interface FormErrors {
   [key: string]: string
 }
 
-export default function EditUserPage() {
-  const [editUser, setEditUser] = useState<EditUser>({
-    firstName: 'Amari',
-    lastName: 'Lubowitz',
-    email: 'amari.lubowitz@domain.ext',
-    role: 'Site Coordinator',
-    clinicalTrials: ['GSXK Diabetes', 'GKR4 Diabetes', 'GYDG Diabetes']
+interface SearchUser {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  status: string
+  role: string
+  startDate: string
+  endDate: string
+  trial: string
+}
+
+export default function AddUserPage() {
+  const [newUser, setNewUser] = useState<NewUser>({
+    firstName: '',
+    lastName: '',
+    email: '',
+    role: '',
+    clinicalTrial: ''
   })
   const [formErrors, setFormErrors] = useState<FormErrors>({})
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [availableTrials, setAvailableTrials] = useState<string[]>([
-    'GSXK Diabetes',
-    'GKR4 Diabetes', 
-    'GYDG Diabetes',
     'Clinical Trial 1',
-    'Clinical Trial 2',
-    'Clinical Trial 3'
+    'Clinical Trial 2'
   ])
+  const [selectedTrials, setSelectedTrials] = useState<string[]>([''])
+  const [userSearch, setUserSearch] = useState<string>('')
+  const [searchResults, setSearchResults] = useState<SearchUser[]>([])
+  const [showSearchResults, setShowSearchResults] = useState<boolean>(false)
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false)
-  const [submittedUser, setSubmittedUser] = useState<EditUser | null>(null)
+  const [submittedUser, setSubmittedUser] = useState<NewUser | null>(null)
   const router = useRouter()
+
+  const isRoleAdminLike = (role: string) => role === 'Admin' || role === 'Superadmin'
+
+  // Function to get clinical trial users
+  const getClinicalTrialUsers = (): SearchUser[] => {
+    return clinicalTrialUsers
+  }
 
   const validateForm = () => {
     const errors: FormErrors = {}
     
-    if (!editUser.firstName.trim()) {
+    if (!newUser.firstName.trim()) {
       errors.firstName = 'First name is required'
     }
     
-    if (!editUser.lastName.trim()) {
+    if (!newUser.lastName.trim()) {
       errors.lastName = 'Last name is required'
     }
     
-    if (!editUser.email.trim()) {
+    if (!newUser.email.trim()) {
       errors.email = 'Email is required'
-    } else if (!/\S+@\S+\.\S+/.test(editUser.email)) {
+    } else if (!/\S+@\S+\.\S+/.test(newUser.email)) {
       errors.email = 'Email is invalid'
     }
     
-    if (!editUser.role) {
+    if (!newUser.role) {
       errors.role = 'Role is required'
     }
     
-    if (editUser.clinicalTrials.length === 0) {
-      errors.clinicalTrials = 'At least one clinical trial is required'
+    // Clinical trials are required only for non-admin roles
+    if (!isRoleAdminLike(newUser.role)) {
+      if (!selectedTrials.some(trial => trial.trim())) {
+        errors.clinicalTrial = 'At least one clinical trial is required'
+      }
     }
     
     setFormErrors(errors)
@@ -70,58 +207,152 @@ export default function EditUserPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!validateForm()) {
+    console.log('=== FORM SUBMISSION DEBUG ===')
+    console.log('Form submitted with data:', newUser)
+    console.log('Selected trials:', selectedTrials)
+    console.log('Form errors before validation:', formErrors)
+    
+    const isValid = validateForm()
+    console.log('Form is valid:', isValid)
+    console.log('Form errors after validation:', formErrors)
+    
+    if (!isValid) {
+      console.log('Form validation failed, stopping submission')
       return
     }
 
+    console.log('Starting form submission...')
     setIsSubmitting(true)
     
     try {
       // Simulate API call
+      console.log('Simulating API call...')
       await new Promise(resolve => setTimeout(resolve, 1000))
       
-      console.log('Successfully updated user:', editUser)
+      const userWithTrials = {
+        ...newUser,
+        clinicalTrials: selectedTrials.filter(trial => trial.trim())
+      }
+      
+      console.log('Successfully added new user:', userWithTrials)
       
       // Store submitted user data and show success modal
-      setSubmittedUser(editUser)
+      setSubmittedUser({
+        ...newUser,
+        clinicalTrial: selectedTrials.filter(trial => trial.trim()).join(', ')
+      })
       setShowSuccessModal(true)
       
+      // Reset form
+      setNewUser({
+        firstName: '',
+        lastName: '',
+        email: '',
+        role: '',
+        clinicalTrial: ''
+      })
+      setSelectedTrials([''])
+      console.log('Form reset completed')
     } catch (error) {
-      console.error('Error updating user:', error)
-      alert('Failed to update user. Please try again.')
+      console.error('Error adding user:', error)
     } finally {
       setIsSubmitting(false)
+      console.log('Form submission completed')
     }
   }
 
   const handleTrialChange = (index: number, value: string) => {
-    const newTrials = [...editUser.clinicalTrials]
+    const newTrials = [...selectedTrials]
     newTrials[index] = value
-    setEditUser({...editUser, clinicalTrials: newTrials})
+    setSelectedTrials(newTrials)
+    
+    // Update the main form data with the first trial
+    if (index === 0) {
+      setNewUser({...newUser, clinicalTrial: value})
+    }
   }
 
   const handleAddTrial = () => {
-    if (editUser.clinicalTrials.length < 5) { // Limit to 5 trials
-      setEditUser({
-        ...editUser, 
-        clinicalTrials: [...editUser.clinicalTrials, '']
-      })
+    if (selectedTrials.length < 5) { // Limit to 5 trials
+      setSelectedTrials([...selectedTrials, ''])
     }
   }
 
   const handleRemoveTrial = (index: number) => {
-    if (editUser.clinicalTrials.length > 1) {
-      const newTrials = editUser.clinicalTrials.filter((_, i) => i !== index)
-      setEditUser({...editUser, clinicalTrials: newTrials})
+    if (selectedTrials.length > 1) {
+      const newTrials = selectedTrials.filter((_, i) => i !== index)
+      setSelectedTrials(newTrials)
+      
+      // Update main form data if we removed the first trial
+      if (index === 0 && newTrials.length > 0) {
+        setNewUser({...newUser, clinicalTrial: newTrials[0]})
+      } else if (newTrials.length === 0) {
+        setNewUser({...newUser, clinicalTrial: ''})
+      }
     }
   }
+
+  // Search functionality
+  const handleSearchChange = (value: string) => {
+    setUserSearch(value)
+    
+    if (value.trim().length > 0) {
+      const allUsers = getClinicalTrialUsers()
+      const filtered = allUsers.filter(user => 
+        user.firstName.toLowerCase().includes(value.toLowerCase()) ||
+        user.lastName.toLowerCase().includes(value.toLowerCase()) ||
+        user.email.toLowerCase().includes(value.toLowerCase()) ||
+        user.trial.toLowerCase().includes(value.toLowerCase()) ||
+        user.role.toLowerCase().includes(value.toLowerCase()) ||
+        user.status.toLowerCase().includes(value.toLowerCase())
+      )
+      setSearchResults(filtered)
+      setShowSearchResults(true)
+    } else {
+      setSearchResults([])
+      setShowSearchResults(false)
+    }
+  }
+
+  // Handle user selection from search results
+  const handleUserSelect = (user: SearchUser) => {
+    setNewUser({
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role,
+      clinicalTrial: user.trial
+    })
+    
+    // Set the selected trial
+    setSelectedTrials([user.trial])
+    
+    setUserSearch('')
+    setSearchResults([])
+    setShowSearchResults(false)
+  }
+
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (!target.closest('.search-container')) {
+        setShowSearchResults(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-2">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h1 className="text-lg font-semibold text-gray-900">Edit User</h1>
+        <div className="flex items-center justify-between p-4">
+          <h1 className="text-lg font-semibold text-gray-900">Add User</h1>
           <button
             onClick={() => router.push('/usersPage')}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -132,6 +363,70 @@ export default function EditUserPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          {/* User Lookup Section */}
+          <div className="space-y-3">
+            <div className="relative search-container">
+              <input
+                type="text"
+                value={userSearch}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Search name, email"
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              />
+              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              
+              {/* Search Results Dropdown */}
+              {showSearchResults && searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+                  {searchResults.map((user) => (
+                    <div
+                      key={user.id}
+                      onClick={() => handleUserSelect(user)}
+                      className="px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-sm text-gray-900">
+                            {user.firstName} {user.lastName}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {user.email} • {user.trial}
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            user.status === 'Active' ? 'bg-green-100 text-green-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {user.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* No Results Message */}
+              {showSearchResults && searchResults.length === 0 && userSearch.trim().length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                  <div className="px-3 py-2 text-sm text-gray-500 text-center">
+                    No users found
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-4 bg-white text-gray-500">or</span>
+              </div>
+            </div>
+          </div>
+
           {/* Form Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* First Name */}
@@ -141,20 +436,22 @@ export default function EditUserPage() {
               </label>
               <input
                 type="text"
-                value={editUser.firstName}
+                value={newUser.firstName}
                 onChange={(e) => {
-                  setEditUser({...editUser, firstName: e.target.value})
+                  setNewUser({...newUser, firstName: e.target.value})
                   if (formErrors.firstName) {
                     setFormErrors({...formErrors, firstName: ''})
                   }
                 }}
-                className={`w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
-                  formErrors.firstName ? 'border-red-500' : ''
-                }`}
+                className={`w-full px-3 py-2 bg-gray-50 border ${
+                  formErrors.firstName ? 'border-red-500' : 'border-gray-200'
+                } rounded-t-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm`}
                 placeholder=""
               />
               {formErrors.firstName && (
-                <p className="mt-1 text-sm text-red-600">{formErrors.firstName}</p>
+                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
+                  Enter first name
+                </div>
               )}
             </div>
 
@@ -165,20 +462,22 @@ export default function EditUserPage() {
               </label>
               <input
                 type="text"
-                value={editUser.lastName}
+                value={newUser.lastName}
                 onChange={(e) => {
-                  setEditUser({...editUser, lastName: e.target.value})
+                  setNewUser({...newUser, lastName: e.target.value})
                   if (formErrors.lastName) {
                     setFormErrors({...formErrors, lastName: ''})
                   }
                 }}
-                className={`w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
-                  formErrors.lastName ? 'border-red-500' : ''
-                }`}
+                className={`w-full px-3 py-2 bg-gray-50 border ${
+                  formErrors.lastName ? 'border-red-500' : 'border-gray-200'
+                } rounded-t-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm`}
                 placeholder=""
               />
               {formErrors.lastName && (
-                <p className="mt-1 text-sm text-red-600">{formErrors.lastName}</p>
+                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
+                  Enter last name
+                </div>
               )}
             </div>
 
@@ -189,20 +488,22 @@ export default function EditUserPage() {
               </label>
               <input
                 type="email"
-                value={editUser.email}
+                value={newUser.email}
                 onChange={(e) => {
-                  setEditUser({...editUser, email: e.target.value})
+                  setNewUser({...newUser, email: e.target.value})
                   if (formErrors.email) {
                     setFormErrors({...formErrors, email: ''})
                   }
                 }}
-                className={`w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
-                  formErrors.email ? 'border-red-500' : ''
-                }`}
+                className={`w-full px-3 py-2 bg-gray-50 border ${
+                  formErrors.email ? 'border-red-500' : 'border-gray-200'
+                } rounded-t-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm`}
                 placeholder=""
               />
               {formErrors.email && (
-                <p className="mt-1 text-sm text-red-600">{formErrors.email}</p>
+                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
+                  Enter email
+                </div>
               )}
             </div>
 
@@ -213,16 +514,25 @@ export default function EditUserPage() {
               </label>
               <div className="relative">
                 <select
-                  value={editUser.role}
+                  value={newUser.role}
                   onChange={(e) => {
-                    setEditUser({...editUser, role: e.target.value})
+                    console.log('Role changed to:', e.target.value)
+                    const role = e.target.value
+                    setNewUser({...newUser, role})
+                    // If admin or superadmin, clear clinical trials selections and related errors
+                    if (role === 'Admin' || role === 'Superadmin') {
+                      setSelectedTrials([''])
+                      if (formErrors.clinicalTrial) {
+                        setFormErrors({...formErrors, clinicalTrial: ''})
+                      }
+                    }
                     if (formErrors.role) {
                       setFormErrors({...formErrors, role: ''})
                     }
                   }}
-                  className={`w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none text-sm ${
-                    formErrors.role ? 'border-red-500' : ''
-                  }`}
+                  className={`w-full px-3 py-2 bg-gray-50 border ${
+                    formErrors.role ? 'border-red-500' : 'border-gray-200'
+                  } rounded-t-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none text-sm`}
                 >
                   <option value="">Select</option>
                   <option value="Study Coord.">Study Coordinator</option>
@@ -233,24 +543,28 @@ export default function EditUserPage() {
                 <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>
               {formErrors.role && (
-                <p className="mt-1 text-sm text-red-600">{formErrors.role}</p>
+                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
+                  Select role
+                </div>
               )}
             </div>
 
             {/* Clinical Trials */}
+            {!isRoleAdminLike(newUser.role) && (
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-gray-900 mb-1">
-                Clinical trial
+                Clinical Trials
               </label>
               <div className="space-y-2">
-                {editUser.clinicalTrials.map((trial, index) => (
+                {selectedTrials.map((trial, index) => (
                   <div key={index} className="flex items-center gap-2">
+                   
                     <div className="w-1/2">
                       <select
                         value={trial}
                         onChange={(e) => handleTrialChange(index, e.target.value)}
                         className={`w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
-                          formErrors.clinicalTrials ? 'border-red-500' : ''
+                          formErrors.clinicalTrial ? 'border-red-500' : ''
                         }`}
                       >
                         <option value="">Select trial</option>
@@ -261,21 +575,19 @@ export default function EditUserPage() {
                         ))}
                       </select>
                     </div>
-                    {editUser.clinicalTrials.length > 1 && (
+                    {selectedTrials.length > 1 && (
                       <button
                         type="button"
                         onClick={() => handleRemoveTrial(index)}
                         className="text-gray-400 hover:text-red-500 p-1"
-                        aria-label="Remove trial"
-                        title="Remove trial"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        🗑
                       </button>
                     )}
                   </div>
                 ))}
-                {/* Clinical trial error above Add trial (match Add User UI) */}
-                {formErrors.clinicalTrials && (
+                {/* Clinical trial error above Add trial */}
+                {formErrors.clinicalTrial && (
                   <div className="mt-2 w-1/2 rounded-lg border border-red-300 bg-white shadow-sm">
                     <div className="flex items-center gap-3 px-4 py-3 text-gray-800">
                       <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-600 text-sm font-semibold">!</span>
@@ -283,8 +595,8 @@ export default function EditUserPage() {
                     </div>
                   </div>
                 )}
-                
-                {editUser.clinicalTrials.length < 5 && (
+
+                {selectedTrials.length < 5 && (
                   <button
                     type="button"
                     onClick={handleAddTrial}
@@ -299,10 +611,14 @@ export default function EditUserPage() {
                 )}
               </div>
             </div>
+            )}
           </div>
 
           {/* Submit Button */}
-          <div className="flex justify-end pt-6">
+          <div className="flex justify-end pt-6 gap-4">
+         
+              
+         
             <button
               type="submit"
               disabled={isSubmitting}
@@ -323,7 +639,7 @@ export default function EditUserPage() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Edit User</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Add User</h2>
               <button
                 onClick={() => setShowSuccessModal(false)}
                 className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -343,7 +659,7 @@ export default function EditUserPage() {
                     </svg>
                   </div>
                 </div>
-                <h3 className="text-lg font-medium text-gray-900">User has been updated</h3>
+                <h3 className="text-lg font-medium text-gray-900">User has been added</h3>
               </div>
 
               {/* Divider */}
@@ -367,7 +683,7 @@ export default function EditUserPage() {
                     {submittedUser.role}
                   </div>
                   <div className="text-xs text-gray-600 space-y-1">
-                    {submittedUser.clinicalTrials.map((trial, index) => (
+                    {submittedUser.clinicalTrial.split(', ').map((trial, index) => (
                       <div key={index}>{trial}</div>
                     ))}
                   </div>
