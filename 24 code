@@ -1,474 +1,581 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { X, Calendar, ChevronDown } from 'lucide-react'
-import DatePicker from 'react-datepicker'
-import 'react-datepicker/dist/react-datepicker.css'
+import { X, Search, Plus, Trash2, Save } from 'lucide-react'
 
-interface ClinicalTrial {
+interface SiteCoordinator {
   id: string
-  name: string
+  firstName: string
+  lastName: string
+  email: string
+  role: string
+  clinicalTrial: string
   status: 'Active' | 'Inactive'
-  phase: string
-  participants: number
   startDate: string
   endDate: string
-  principalInvestigator: string
-  sites: number
 }
 
-// Mock data for existing clinical trials
-const existingClinicalTrials: ClinicalTrial[] = [
+interface FormErrors {
+  [key: string]: string
+}
+
+// Mock data for existing site coordinators (matching site-coordinators page data)
+const existingSiteCoordinators: SiteCoordinator[] = [
   {
     id: '1',
-    name: 'GSXK Diabetes Study',
+    firstName: 'Audra',
+    lastName: 'Luettgen',
+    email: 'Audra.Luettgen@domain.ext',
+    role: 'Site Coord.',
+    clinicalTrial: 'Clinical Trial 1',
     status: 'Active',
-    phase: 'Phase III',
-    participants: 150,
     startDate: '15/01/2024',
-    endDate: '15/12/2024',
-    principalInvestigator: 'Dr. Sarah Johnson',
-    sites: 12
+    endDate: '15/12/2024'
   },
   {
     id: '2',
-    name: 'GKR4 Oncology Trial',
+    firstName: 'Augustus',
+    lastName: 'Daugherty',
+    email: 'Augustus.Daugherty@domain.ext',
+    role: 'Site Coord.',
+    clinicalTrial: 'Clinical Trial 1',
     status: 'Active',
-    phase: 'Phase II',
-    participants: 85,
     startDate: '20/02/2024',
-    endDate: '20/11/2024',
-    principalInvestigator: 'Dr. Michael Chen',
-    sites: 8
+    endDate: '20/11/2024'
   },
   {
     id: '3',
-    name: 'GYDG Cardiovascular Study',
+    firstName: 'Dessie',
+    lastName: 'Grady',
+    email: 'Dessie.Grady@domain.ext',
+    role: 'Site Coord.',
+    clinicalTrial: 'Clinical Trial 1',
+    status: 'Active',
+    startDate: '10/03/2024',
+    endDate: '10/10/2024'
+  },
+  {
+    id: '4',
+    firstName: 'Selina',
+    lastName: 'Abernathy',
+    email: 'Selina.Abernathy@domain.ext',
+    role: 'Site Coord.',
+    clinicalTrial: 'Clinical Trial 1',
+    status: 'Active',
+    startDate: '05/04/2024',
+    endDate: '05/09/2024'
+  },
+  {
+    id: '5',
+    firstName: 'Lyda',
+    lastName: 'Gulgowski',
+    email: 'Lyda.Gulgowski@domain.ext',
+    role: 'Site Coord.',
+    clinicalTrial: 'Clinical Trial 1',
+    status: 'Active',
+    startDate: '12/05/2024',
+    endDate: '12/08/2024'
+  },
+  {
+    id: '6',
+    firstName: 'Lola',
+    lastName: 'Rutherford',
+    email: 'Lola.Rutherford@domain.ext',
+    role: 'Site Coord.',
+    clinicalTrial: 'Clinical Trial 1',
     status: 'Inactive',
-    phase: 'Phase III',
-    participants: 200,
-    startDate: '10/03/2023',
-    endDate: '10/12/2023',
-    principalInvestigator: 'Dr. Emily Rodriguez',
-    sites: 15
+    startDate: '01/06/2024',
+    endDate: '01/07/2024'
   }
 ]
 
-export default function AddClinicalTrialPage() {
+const availableRoles = [
+  'Site Coord.',
+  'Study Coord.',
+  'Admin',
+  'User'
+]
+
+const availableTrials = [
+  'Clinical Trial 1',
+  'Clinical Trial 2',
+  'Clinical Trial 3'
+]
+
+export default function AddSiteCoordinatorPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const editId = searchParams.get('edit')
   
   const [isEditing, setIsEditing] = useState(false)
-  const [formData, setFormData] = useState({
-    trialCode: '',
-    diseaseState: '',
-    countryRegion: [] as string[],
-    language: [] as string[],
-    startDate: null as Date | null,
-    endDate: null as Date | null
+  const [siteCoordinator, setSiteCoordinator] = useState<SiteCoordinator>({
+    id: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    role: '',
+    clinicalTrial: '',
+    status: 'Active',
+    startDate: '',
+    endDate: ''
   })
-  const [showCountryDropdown, setShowCountryDropdown] = useState(false)
-  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false)
+  
+  const [formErrors, setFormErrors] = useState<FormErrors>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
-  const countryRef = useRef<HTMLDivElement>(null)
-  const languageRef = useRef<HTMLDivElement>(null)
+  const [addedCoordinator, setAddedCoordinator] = useState<SiteCoordinator | null>(null)
+  const [submittedTrials, setSubmittedTrials] = useState<string[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<SiteCoordinator[]>([])
+  const [showSearchResults, setShowSearchResults] = useState(false)
+  const [selectedTrials, setSelectedTrials] = useState<string[]>([''])
 
-  // Load trial data when editing
   useEffect(() => {
     if (editId) {
-      const trial = existingClinicalTrials.find(t => t.id === editId)
-      if (trial) {
-        // Parse dates from DD/MM/YYYY format
-        const parseDate = (dateStr: string): Date | null => {
-          if (!dateStr) return null;
-          const parts = dateStr.split('/').map(Number);
-          if (parts.length === 3) {
-            const [day, month, year] = parts;
-            if (day && month && year) {
-              const d = new Date(year, month - 1, day);
-              if (!isNaN(d.getTime())) return d;
-            }
-          }
-          return null;
-        };
-
-        setFormData({
-          trialCode: trial.name,
-          diseaseState: trial.phase,
-          countryRegion: ['US'], // Default for now
-          language: ['English'], // Default for now
-          startDate: parseDate(trial.startDate),
-          endDate: parseDate(trial.endDate)
-        })
+      const coordinator = existingSiteCoordinators.find(c => c.id === editId)
+      if (coordinator) {
+        setSiteCoordinator(coordinator)
         setIsEditing(true)
+        // Seed trials list when coming directly via edit link
+        setSelectedTrials([coordinator.clinicalTrial || ''])
       }
     }
   }, [editId])
 
-  const handleInputChange = (field: string, value: string | Date | null) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
+  const validateForm = () => {
+    const errors: FormErrors = {}
+    
+    if (!siteCoordinator.firstName.trim()) {
+      errors.firstName = 'First name is required'
+    }
+    
+    if (!siteCoordinator.lastName.trim()) {
+      errors.lastName = 'Last name is required'
+    }
+    
+    if (!siteCoordinator.email.trim()) {
+      errors.email = 'Email is required'
+    } else if (!/\S+@\S+\.\S+/.test(siteCoordinator.email)) {
+      errors.email = 'Email is invalid'
+    }
+    if (!siteCoordinator.clinicalTrial) {
+      errors.clinicalTrial = 'Clinical trial is required'
+    }
+    
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
   }
 
-  const handleMultiSelect = (field: 'countryRegion' | 'language', value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: prev[field].includes(value)
-        ? prev[field].filter(item => item !== value)
-        : [...prev[field], value]
-    }))
-  }
-
-  const countryOptions = [
-    { value: 'US', label: 'United States (US)' },
-    { value: 'PR', label: 'Puerto Rico (PR)' },
-    { value: 'CA', label: 'Canada (CA)' },
-    { value: 'UK', label: 'United Kingdom (UK)' },
-    { value: 'DE', label: 'Germany (DE)' },
-    { value: 'FR', label: 'France (FR)' },
-    { value: 'AU', label: 'Australia (AU)' },
-    { value: 'JP', label: 'Japan (JP)' },
-    { value: 'IN', label: 'India (IN)' },
-    { value: 'BR', label: 'Brazil (BR)' },
-    { value: 'MX', label: 'Mexico (MX)' }
-  ]
-
-  const languageOptions = [
-    { value: 'EN', label: 'English (EN)' },
-    { value: 'ES', label: 'Español (ES)' },
-    { value: 'FR', label: 'Français (FR)' },
-    { value: 'DE', label: 'Deutsch (DE)' },
-    { value: 'IT', label: 'Italiano (IT)' },
-    { value: 'PT', label: 'Português (PT)' },
-    { value: 'JA', label: '日本語 (JA)' },
-    { value: 'KO', label: '한국어 (KO)' },
-    { value: 'ZH', label: '中文 (ZH)' },
-    { value: 'HI', label: 'हिन्दी (HI)' }
-  ]
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Form submitted:', formData)
     
-    // Format date helper
-    const formatDate = (date: Date): string => {
-      const day = String(date.getDate()).padStart(2, '0')
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const year = String(date.getFullYear())
-      return `${day}/${month}/${year}`
+    console.log('=== SITE COORDINATOR FORM SUBMISSION ===')
+    console.log('Form data:', siteCoordinator)
+    console.log('Is editing:', isEditing)
+    // Ensure clinical trial is synced from the first selected trial if present
+    const firstSelectedTrial = (selectedTrials || []).find(t => t && t.trim().length > 0) || ''
+    if (!siteCoordinator.clinicalTrial && firstSelectedTrial) {
+      setSiteCoordinator(prev => ({ ...prev, clinicalTrial: firstSelectedTrial }))
     }
     
-    // Create new trial object
-    const newTrial = {
-      id: isEditing ? editId! : String(Date.now()),
-      name: formData.trialCode,
-      status: 'Active' as 'Active' | 'Inactive',
-      phase: formData.diseaseState,
-      participants: Math.floor(Math.random() * 200) + 20,
-      startDate: formData.startDate ? formatDate(formData.startDate) : '',
-      endDate: formData.endDate ? formatDate(formData.endDate) : '',
-      principalInvestigator: 'Dr. TBD',
-      sites: Math.floor(Math.random() * 10) + 3,
-      countryRegion: formData.countryRegion,
-      language: formData.language
+    if (!validateForm()) {
+      console.log('Form validation failed:', formErrors)
+      return
     }
+
+    setIsSubmitting(true)
     
-    // Get existing trials
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('clinicalTrials')
-      let existingTrials = stored ? JSON.parse(stored) : existingClinicalTrials
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000))
       
-      // Add or update
-      if (isEditing) {
-        existingTrials = existingTrials.map((t: ClinicalTrial) => 
-          t.id === editId ? newTrial : t
-        )
-      } else {
-        existingTrials.push(newTrial)
+      console.log('Successfully saved site coordinator:', siteCoordinator)
+      
+      // Store the added coordinator and trials for success modal
+      setAddedCoordinator(siteCoordinator)
+      setSubmittedTrials(selectedTrials.filter(t => t && t.trim().length > 0))
+      setShowSuccessModal(true)
+      
+      // Reset form if adding new
+      if (!isEditing) {
+        setSiteCoordinator({
+          id: '',
+          firstName: '',
+          lastName: '',
+          email: '',
+          role: '',
+          clinicalTrial: '',
+          status: 'Active',
+          startDate: '',
+          endDate: ''
+        })
       }
-      
-      localStorage.setItem('clinicalTrials', JSON.stringify(existingTrials))
+    } catch (error) {
+      console.error('Error saving site coordinator:', error)
+      alert('Failed to save site coordinator. Please try again.')
+    } finally {
+      setIsSubmitting(false)
     }
+  }
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
     
-    // Show success modal
-    setShowSuccessModal(true)
+    if (value.trim().length > 0) {
+      const filtered = existingSiteCoordinators.filter(coordinator => 
+        coordinator.firstName.toLowerCase().includes(value.toLowerCase()) ||
+        coordinator.lastName.toLowerCase().includes(value.toLowerCase()) ||
+        coordinator.email.toLowerCase().includes(value.toLowerCase()) ||
+        coordinator.role.toLowerCase().includes(value.toLowerCase())
+      )
+      setSearchResults(filtered)
+      setShowSearchResults(true)
+    } else {
+      setSearchResults([])
+      setShowSearchResults(false)
+    }
   }
 
-  const handleClose = () => {
-    router.push('/clinical-trials')
+  const handleCoordinatorSelect = (coordinator: SiteCoordinator) => {
+    setSiteCoordinator(coordinator)
+    setIsEditing(true)
+    setSearchQuery('')
+    setSearchResults([])
+    setShowSearchResults(false)
+    setSelectedTrials([coordinator.clinicalTrial || ''])
   }
 
-  const handleSuccessModalClose = () => {
+  const handleInputChange = (field: keyof SiteCoordinator, value: string) => {
+    setSiteCoordinator(prev => ({ ...prev, [field]: value }))
+    if (formErrors[field]) {
+      setFormErrors(prev => ({ ...prev, [field]: '' }))
+    }
+  }
+
+  const closeSuccessModal = () => {
     setShowSuccessModal(false)
-    router.push('/clinical-trials')
+    setAddedCoordinator(null)
   }
 
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (countryRef.current && !countryRef.current.contains(event.target as Node)) {
-        setShowCountryDropdown(false)
-      }
-      if (languageRef.current && !languageRef.current.contains(event.target as Node)) {
-        setShowLanguageDropdown(false)
-      }
+  // Trials helpers (match Add User behaviour)
+  const handleTrialChange = (index: number, value: string) => {
+    const trials = [...selectedTrials]
+    trials[index] = value
+    setSelectedTrials(trials)
+    if (index === 0) {
+      setSiteCoordinator(prev => ({ ...prev, clinicalTrial: value }))
     }
+  }
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
+  const handleAddTrial = () => {
+    if (selectedTrials.length < 5) {
+      setSelectedTrials(prev => [...prev, ''])
     }
-  }, [])
+  }
+
+  const handleRemoveTrial = (index: number) => {
+    if (selectedTrials.length > 1) {
+      const trials = selectedTrials.filter((_, i) => i !== index)
+      setSelectedTrials(trials)
+      if (index === 0) {
+        setSiteCoordinator(prev => ({ ...prev, clinicalTrial: trials[0] || '' }))
+      }
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 relative">
-        {/* Close Button */}
-        <button
-          onClick={handleClose}
-          className="absolute top-6 right-6 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
-        >
-          <X className="w-4 h-4 text-gray-600" />
-        </button>
-
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-xl font-bold text-gray-900">
-            {isEditing ? 'Edit Clinical Trial' : 'Add Clinical Trial'}
-          </h1>
+        <div className="flex items-center justify-between p-4">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">
+              {isEditing ? 'Edit Site Coordinator' : 'Add Site Coordinator'}
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">
+              {isEditing ? 'Update site coordinator information' : ''}
+            </p>
+          </div>
+          <button
+            onClick={() => router.push('/site-coordinators')}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <X className="h-6 w-6 text-gray-600" />
+          </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Left Column */}
-            <div className="space-y-6">
-              {/* Trial Code */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Trial Code
-                </label>
-                <input
-                  type="text"
-                  value={formData.trialCode}
-                  onChange={(e) => handleInputChange('trialCode', e.target.value)}
-                  className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder=""
-                />
-              </div>
-
-              {/* Country/Region */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Country/Region
-                </label>
-                <div className="relative" ref={countryRef}>
-                  <button
-                    type="button"
-                    onClick={() => setShowCountryDropdown(!showCountryDropdown)}                    className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between"
+        <form onSubmit={handleSubmit} className="px-4 pt-2 pb-4 space-y-4">
+          {/* Search Section (hidden in edit mode) */}
+          {!isEditing && (
+          <div className="space-y-4">
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Search name"
+                className="w-full px-4 py-1 bg-gray-50 border border-gray-200 rounded-3xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            </div>
+            
+            {showSearchResults && searchResults.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {searchResults.map((coordinator) => (
+                  <div
+                    key={coordinator.id}
+                    onClick={() => handleCoordinatorSelect(coordinator)}
+                    className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
                   >
-                    <span className={formData.countryRegion.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
-                      {formData.countryRegion.length === 0 ? 'Select' : `${formData.countryRegion.length} selected`}
-                    </span>
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
-                  </button>
-                  
-                  {showCountryDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                      {countryOptions.map((option) => (
-                        <label
-                          key={option.value}
-                          className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.countryRegion.includes(option.value)}
-                            onChange={() => handleMultiSelect('countryRegion', option.value)}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                          <span className="ml-3 text-sm text-gray-700">{option.label}</span>
-                        </label>
-                      ))}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-sm text-gray-900">
+                          {coordinator.firstName} {coordinator.lastName}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {coordinator.email} • {coordinator.role}
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          coordinator.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {coordinator.status}
+                        </span>
+                      </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ))}
               </div>
-
-              {/* Start Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Start date
-                </label>
-                <div className="relative">
-                  <DatePicker
-                    selected={formData.startDate}
-                    onChange={(date: Date | null) => handleInputChange('startDate', date)}
-                    placeholderText=""
-                    className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    dateFormat="dd/MM/yyyy"
-                  />
-                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
+            )}
+            
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-3 bg-white text-gray-500">or</span>
               </div>
             </div>
+          </div>
+          )}
 
-            {/* Right Column */}
-            <div className="space-y-6">
-              {/* Disease State */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Disease State
-                </label>
-                <input
-                  type="text"
-                  value={formData.diseaseState}
-                  onChange={(e) => handleInputChange('diseaseState', e.target.value)}
-                  className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder=""
-                />
-              </div>
+          {/* Form Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* First Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                First Name
+              </label>
+              <input
+                type="text"
+                value={siteCoordinator.firstName}
+                onChange={(e) => handleInputChange('firstName', e.target.value)}
+                className={`w-full px-3 py-2 bg-gray-50 border rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  formErrors.firstName ? 'border-red-500' : 'border-gray-200'
+                }`}
+                placeholder="Enter first name"
+              />
+              {formErrors.firstName && (
+                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
+                  {formErrors.firstName || 'Enter first name'}
+                </div>
+              )}
+            </div>
 
-              {/* Language */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Language
-                </label>
-                <div className="relative" ref={languageRef}>
+            {/* Last Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Last Name 
+              </label>
+              <input
+                type="text"
+                value={siteCoordinator.lastName}
+                onChange={(e) => handleInputChange('lastName', e.target.value)}
+                className={`w-full px-3 py-2 bg-gray-50 border rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  formErrors.lastName ? 'border-red-500' : 'border-gray-200'
+                }`}
+                placeholder="Enter last name"
+              />
+              {formErrors.lastName && (
+                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
+                  {formErrors.lastName || 'Enter last name'}
+                </div>
+              )}
+            </div>
+
+            {/* Email */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email 
+              </label>
+              <input
+                type="email"
+                value={siteCoordinator.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                className={`w-full px-3 py-2 bg-gray-50 border rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  formErrors.email ? 'border-red-500' : 'border-gray-200'
+                }`}
+                placeholder="Enter email address"
+              />
+              {formErrors.email && (
+                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
+                  {formErrors.email || 'Enter email'}
+                </div>
+              )}
+            </div>
+
+
+            {/* Clinical Trials (multi) */}
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-900 mb-1">
+                Clinical Trials
+              </label>
+              <div className="space-y-2">
+                {selectedTrials.map((trial, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div className="w-1/2">
+                      <select
+                        value={trial}
+                        onChange={(e) => handleTrialChange(index, e.target.value)}
+                        className={`w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
+                          formErrors.clinicalTrial ? 'border-red-500' : ''
+                        }`}
+                      >
+                        <option value="">Select trial</option>
+                        {availableTrials.map((availableTrial) => (
+                          <option key={availableTrial} value={availableTrial}>
+                            {availableTrial}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {selectedTrials.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTrial(index)}
+                        className="text-gray-400 hover:text-red-500 p-1"
+                      >
+                        🗑
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {/* Error above Add trial */}
+                {formErrors.clinicalTrial && (
+                  <div className="mt-2 w-1/2 rounded-lg border border-red-300 bg-white shadow-sm">
+                    <div className="flex items-center gap-3 px-4 py-3 text-gray-800">
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-600 text-sm font-semibold">!</span>
+                      <span className="text-sm">Select a clinical trial</span>
+                    </div>
+                  </div>
+                )}
+
+                {selectedTrials.length < 5 && (
                   <button
                     type="button"
-                    onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-                    className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between"
+                    onClick={handleAddTrial}
+                    className="w-1/2 mt-2 border border-gray-300 rounded-full px-4 py-1 text-gray-400 flex items-center justify-between hover:bg-gray-50"
+                    aria-label="Add trial"
                   >
-                    <span className={formData.language.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
-                      {formData.language.length === 0 ? 'Select' : `${formData.language.length} selected`}
+                    <span className="mx-auto">Add trial</span>
+                    <span className="ml-2 inline-flex items-center justify-center w-7 h-5 rounded-full border border-gray-300 text-gray-400">
+                      <Plus className="w-4 h-4" />
                     </span>
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
                   </button>
-                  
-                  {showLanguageDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                      {languageOptions.map((option) => (
-                        <label
-                          key={option.value}
-                          className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.language.includes(option.value)}
-                            onChange={() => handleMultiSelect('language', option.value)}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                          <span className="ml-3 text-sm text-gray-700">{option.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* End Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  End date
-                </label>
-                <div className="relative">
-                  <DatePicker
-                    selected={formData.endDate}
-                    onChange={(date: Date | null) => handleInputChange('endDate', date)}
-                    placeholderText=""
-                    className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    dateFormat="dd/MM/yyyy"
-                  />
-                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
+                )}
               </div>
             </div>
           </div>
 
           {/* Submit Button */}
-          <div className="flex justify-end pt-6">
+          <div className="flex justify-end pt-6 gap-4">
+         
+              
+         
             <button
               type="submit"
-              className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg font-medium flex items-center space-x-2 transition-colors"
+              disabled={isSubmitting}
+              className="flex items-center space-x-2 px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <span>Submit</span>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
           </div>
         </form>
       </div>
-
       {/* Success Modal */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative">
-            {/* Close Button */}
-            <button
-              onClick={handleSuccessModalClose}
-              className="absolute top-4 right-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
-            >
-              <X className="w-4 h-4 text-gray-600" />
-            </button>
-
-            {/* Header */}
-            <div className="mb-4">
-              <h2 className="text-xl font-bold text-gray-900">{isEditing ? 'Edit Clinical Trial' : 'Add Clinical Trial'}</h2>
-            </div>
-
-            <hr className="border-gray-200 mb-4" />
-
-            {/* Success Message */}
-            <div className="flex items-center justify-center mb-6">
-              <div className="bg-green-100 rounded-full p-2 mr-3">
-                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <p className="text-lg font-bold text-gray-900">{isEditing ? 'Clinical Trial has been edited' : 'Clinical Trial has been added'}</p>
-            </div>
-
-            <hr className="border-gray-200 mb-6" />
-
-            {/* Trial Details */}
-            <div className="grid grid-cols-2 gap-y-2 text-sm mb-6">
-              <div>
-                <p className="font-bold text-gray-900">{formData.trialCode || 'GSXL Diabetes'}</p>
-                <p className="text-gray-700">
-                  {formData.countryRegion.length > 0
-                    ? countryOptions.filter(opt => formData.countryRegion.includes(opt.value)).map(opt => opt.label.split(' ')[0]).join(', ')
-                    : 'United States'}
-                </p>
-                <p className="text-gray-700">
-                  {formData.language.length > 0
-                    ? languageOptions.filter(opt => formData.language.includes(opt.value)).map(opt => opt.label.split(' ')[0]).join(', ')
-                    : 'English, Español'}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="font-bold text-gray-900">
-                  Start Date: {formData.startDate ? formData.startDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '10/20/24'}
-                </p>
-                <p className="font-bold text-gray-900">
-                  End Date: {formData.endDate ? formData.endDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '9/30/26'}
-                </p>
-              </div>
-            </div>
-
-            {/* Close Button */}
-            <div className="flex justify-end">
+      {showSuccessModal && addedCoordinator && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4">
+              <h2 className="text-lg font-semibold text-gray-900">{isEditing ? 'Edit Site Coordinator' : 'Add Site Coordinator'}</h2>
               <button
-                onClick={handleSuccessModalClose}
-                className="bg-red-600 text-white px-6 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 hover:bg-red-700 transition-colors"
+                onClick={() => setShowSuccessModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
               >
-                <span>Close</span>
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5 text-gray-600" />
               </button>
+            </div>
+
+            {/* Success Content */}
+            <div className="p-6">
+              {/* Success Message */}
+              <div className="text-center mb-6">
+                <div className="flex items-center justify-center mb-3">
+                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900">{isEditing ? 'Site Coordinator has been edited' : 'Site Coordinator has been added'}</h3>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-gray-200 mb-6"></div>
+
+              {/* Coordinator Details */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                {/* Left Column - Coordinator Info */}
+                <div>
+                  <div className="font-semibold text-gray-900 text-sm mb-1">
+                    {addedCoordinator.firstName} {addedCoordinator.lastName}
+                  </div>
+                  <div className="text-xs text-gray-600">
+                    {addedCoordinator.email}
+                  </div>
+                </div>
+
+                {/* Right Column - Role and Trials (role optional) */}
+                <div>
+                  <div className="font-semibold text-gray-900 text-sm mb-1">Site Coordinator</div>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    {(submittedTrials.length > 0 ? submittedTrials : [addedCoordinator.clinicalTrial])
+                      .filter(Boolean)
+                      .map((trial, index) => (
+                        <div key={index}>{trial}</div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowSuccessModal(false)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  <span>Close</span>
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
