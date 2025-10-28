@@ -1,48 +1,393 @@
 'use client'
 
-import { Phone, Clock } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { X, ChevronDown, Plus, Trash2 } from 'lucide-react'
 
-export default function SupportPage() {
-  return (
-    <div className="min-h-screen p-8">
-      {/* Title */}
-      <h1 className="text-3xl font-normal text-black mb-2">
-        Portal Support and Pharmacy Help Desk
-      </h1>
+interface EditUser {
+  firstName: string
+  lastName: string
+  email: string
+  role: string
+  clinicalTrials: string[]
+}
+
+interface FormErrors {
+  [key: string]: string
+}
+
+export default function EditUserPage() {
+  const [editUser, setEditUser] = useState<EditUser>({
+    firstName: 'Amari',
+    lastName: 'Lubowitz',
+    email: 'amari.lubowitz@domain.ext',
+    role: 'Site Coordinator',
+    clinicalTrials: ['GSXK Diabetes', 'GKR4 Diabetes', 'GYDG Diabetes']
+  })
+  const [formErrors, setFormErrors] = useState<FormErrors>({})
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
+  const [availableTrials, setAvailableTrials] = useState<string[]>([
+    'GSXK Diabetes',
+    'GKR4 Diabetes', 
+    'GYDG Diabetes',
+    'Clinical Trial 1',
+    'Clinical Trial 2',
+    'Clinical Trial 3'
+  ])
+  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false)
+  const [submittedUser, setSubmittedUser] = useState<EditUser | null>(null)
+  const router = useRouter()
+
+  const validateForm = () => {
+    const errors: FormErrors = {}
+    
+    if (!editUser.firstName.trim()) {
+      errors.firstName = 'First name is required'
+    }
+    
+    if (!editUser.lastName.trim()) {
+      errors.lastName = 'Last name is required'
+    }
+    
+    if (!editUser.email.trim()) {
+      errors.email = 'Email is required'
+    } else if (!/\S+@\S+\.\S+/.test(editUser.email)) {
+      errors.email = 'Email is invalid'
+    }
+    
+    if (!editUser.role) {
+      errors.role = 'Role is required'
+    }
+    
+    if (editUser.clinicalTrials.length === 0) {
+      errors.clinicalTrials = 'At least one clinical trial is required'
+    }
+    
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!validateForm()) {
+      return
+    }
+
+    setIsSubmitting(true)
+    
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000))
       
-      {/* Subtitle */}
-      <p className="text-lg text-black mb-8">
-        (Operate by EVERSANA Life Science Services, LLC)
-      </p>
+      console.log('Successfully updated user:', editUser)
+      
+      // Store submitted user data and show success modal
+      setSubmittedUser(editUser)
+      setShowSuccessModal(true)
+      
+    } catch (error) {
+      console.error('Error updating user:', error)
+      alert('Failed to update user. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
-      {/* Phone Line Section */}
-      <div className="flex items-start gap-4 mb-6">
-        <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center flex-shrink-0">
-          <Phone className="w-6 h-6 text-white" />
+  const handleTrialChange = (index: number, value: string) => {
+    const newTrials = [...editUser.clinicalTrials]
+    newTrials[index] = value
+    setEditUser({...editUser, clinicalTrials: newTrials})
+  }
+
+  const handleAddTrial = () => {
+    if (editUser.clinicalTrials.length < 5) { // Limit to 5 trials
+      setEditUser({
+        ...editUser, 
+        clinicalTrials: [...editUser.clinicalTrials, '']
+      })
+    }
+  }
+
+  const handleRemoveTrial = (index: number) => {
+    if (editUser.clinicalTrials.length > 1) {
+      const newTrials = editUser.clinicalTrials.filter((_, i) => i !== index)
+      setEditUser({...editUser, clinicalTrials: newTrials})
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-2">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <h1 className="text-lg font-semibold text-gray-900">Edit User</h1>
+          <button
+            onClick={() => router.push('/usersPage')}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <X className="h-5 w-5 text-gray-600" />
+          </button>
         </div>
-        <div>
-          <h2 className="text-lg font-bold text-black mb-1">Phone Line</h2>
-          <p className="text-base text-black mb-2">
-            Lilly Clinical Trial Support Center Phone Line (Operated by EVERSANA)
-          </p>
-          <p className="text-xl font-bold text-black">
-            1-866-777-5704
-          </p>
-        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          {/* Form Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* First Name */}
+            <div>
+              <label className="block text-xs font-medium text-gray-900 mb-1">
+                First Name
+              </label>
+              <input
+                type="text"
+                value={editUser.firstName}
+                onChange={(e) => {
+                  setEditUser({...editUser, firstName: e.target.value})
+                  if (formErrors.firstName) {
+                    setFormErrors({...formErrors, firstName: ''})
+                  }
+                }}
+                className={`w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
+                  formErrors.firstName ? 'border-red-500' : ''
+                }`}
+                placeholder=""
+              />
+              {formErrors.firstName && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.firstName}</p>
+              )}
+            </div>
+
+            {/* Last Name */}
+            <div>
+              <label className="block text-xs font-medium text-gray-900 mb-1">
+                Last Name
+              </label>
+              <input
+                type="text"
+                value={editUser.lastName}
+                onChange={(e) => {
+                  setEditUser({...editUser, lastName: e.target.value})
+                  if (formErrors.lastName) {
+                    setFormErrors({...formErrors, lastName: ''})
+                  }
+                }}
+                className={`w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
+                  formErrors.lastName ? 'border-red-500' : ''
+                }`}
+                placeholder=""
+              />
+              {formErrors.lastName && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.lastName}</p>
+              )}
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="block text-xs font-medium text-gray-900 mb-1">
+                Email
+              </label>
+              <input
+                type="email"
+                value={editUser.email}
+                onChange={(e) => {
+                  setEditUser({...editUser, email: e.target.value})
+                  if (formErrors.email) {
+                    setFormErrors({...formErrors, email: ''})
+                  }
+                }}
+                className={`w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
+                  formErrors.email ? 'border-red-500' : ''
+                }`}
+                placeholder=""
+              />
+              {formErrors.email && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.email}</p>
+              )}
+            </div>
+
+            {/* Role */}
+            <div>
+              <label className="block text-xs font-medium text-gray-900 mb-1">
+                Role
+              </label>
+              <div className="relative">
+                <select
+                  value={editUser.role}
+                  onChange={(e) => {
+                    setEditUser({...editUser, role: e.target.value})
+                    if (formErrors.role) {
+                      setFormErrors({...formErrors, role: ''})
+                    }
+                  }}
+                  className={`w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none text-sm ${
+                    formErrors.role ? 'border-red-500' : ''
+                  }`}
+                >
+                  <option value="">Select</option>
+                  <option value="Study Coord.">Study Coordinator</option>
+                  <option value="Site Coord.">Site Coordinator</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Superadmin">Superadmin</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              </div>
+              {formErrors.role && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.role}</p>
+              )}
+            </div>
+
+            {/* Clinical Trials */}
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-900 mb-1">
+                Clinical trial
+              </label>
+              <div className="space-y-2">
+                {editUser.clinicalTrials.map((trial, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div className="w-1/2">
+                      <select
+                        value={trial}
+                        onChange={(e) => handleTrialChange(index, e.target.value)}
+                        className={`w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
+                          formErrors.clinicalTrials ? 'border-red-500' : ''
+                        }`}
+                      >
+                        <option value="">Select trial</option>
+                        {availableTrials.map((availableTrial) => (
+                          <option key={availableTrial} value={availableTrial}>
+                            {availableTrial}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {editUser.clinicalTrials.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTrial(index)}
+                        className="text-gray-400 hover:text-red-500 p-1"
+                        aria-label="Remove trial"
+                        title="Remove trial"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {/* Clinical trial error above Add trial (match Add User UI) */}
+                {formErrors.clinicalTrials && (
+                  <div className="mt-2 w-1/2 rounded-lg border border-red-300 bg-white shadow-sm">
+                    <div className="flex items-center gap-3 px-4 py-3 text-gray-800">
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-600 text-sm font-semibold">!</span>
+                      <span className="text-sm">Select a clinical trial</span>
+                    </div>
+                  </div>
+                )}
+                
+                {editUser.clinicalTrials.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={handleAddTrial}
+                    className="w-1/2 mt-2 border border-gray-300 rounded-full px-4 py-1 text-gray-400 flex items-center justify-between hover:bg-gray-50"
+                    aria-label="Add trial"
+                  >
+                    <span className="mx-auto">Add trial</span>
+                    <span className="ml-2 inline-flex items-center justify-center w-7 h-5 rounded-full border border-gray-300 text-gray-400">
+                      <Plus className="w-4 h-4" />
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Submit Button */}
+          <div className="flex justify-end pt-6">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex items-center space-x-2 px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <span>Submit</span>
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </form>
       </div>
 
-      {/* Hours Section */}
-      <div className="flex items-start gap-4">
-        <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center flex-shrink-0">
-          <Clock className="w-6 h-6 text-white" />
+      {/* Success Modal */}
+      {showSuccessModal && submittedUser && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Edit User</h2>
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
+
+            {/* Success Content */}
+            <div className="p-6">
+              {/* Success Message */}
+              <div className="text-center mb-6">
+                <div className="flex items-center justify-center mb-3">
+                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900">User has been updated</h3>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-gray-200 mb-6"></div>
+
+              {/* User Details */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                {/* Left Column - User Info */}
+                <div>
+                  <div className="font-semibold text-gray-900 text-sm mb-1">
+                    {submittedUser.firstName} {submittedUser.lastName}
+                  </div>
+                  <div className="text-xs text-gray-600">
+                    {submittedUser.email}
+                  </div>
+                </div>
+
+                {/* Right Column - Role and Trials */}
+                <div>
+                  <div className="font-semibold text-gray-900 text-sm mb-1">
+                    {submittedUser.role}
+                  </div>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    {submittedUser.clinicalTrials.map((trial, index) => (
+                      <div key={index}>{trial}</div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowSuccessModal(false)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  <span>Close</span>
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-        <div>
-          <h2 className="text-lg font-bold text-black mb-1">Hours</h2>
-          <p className="text-base text-black">
-            Monday - Friday, 8:00am - 8:00pm ET
-          </p>
-        </div>
-      </div>
+      )}
     </div>
   )
 }
