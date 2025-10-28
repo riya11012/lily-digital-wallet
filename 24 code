@@ -1,703 +1,428 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, X, ChevronDown, Plus } from 'lucide-react'
-// Clinical trial users data from the Admin Users page
-const clinicalTrialUsers = [
-  // Clinical Trial 1 users
+import { Search, Plus, ChevronDown, MoreVertical, X } from 'lucide-react'
+import DatePicker from 'react-datepicker'
+import 'react-datepicker/dist/react-datepicker.css'
+
+interface ClinicalTrial {
+  id: string
+  name: string
+  status: 'Active' | 'Inactive'
+  phase: string
+  participants: number
+  startDate: string
+  endDate: string
+  principalInvestigator: string
+  sites: number
+}
+
+const clinicalTrials: ClinicalTrial[] = [
   {
     id: '1',
-    firstName: 'Audra',
-    lastName: 'Luettgen',
-    email: 'Audra.Luettgen@domain.ext',
+    name: 'GIDF',
     status: 'Active',
-    role: 'Study Coord.',
+    phase: 'Diabetes',
+    participants: 150,
     startDate: '15/01/2024',
     endDate: '15/12/2024',
-    trial: 'Clinical Trial 1'
+    principalInvestigator: 'Dr. Sarah Johnson',
+    sites: 12
   },
   {
     id: '2',
-    firstName: 'Augustus',
-    lastName: 'Daugherty',
-    email: 'Augustus.Daugherty@domain.ext',
+    name: 'GIDI',
     status: 'Active',
-    role: 'Site Coord.',
+    phase: 'Diabetes',
+    participants: 85,
     startDate: '20/02/2024',
     endDate: '20/11/2024',
-    trial: 'Clinical Trial 1'
+    principalInvestigator: 'Dr. Michael Chen',
+    sites: 8
   },
   {
     id: '3',
-    firstName: 'Dessie',
-    lastName: 'Grady',
-    email: 'Dessie.Grady@domain.ext',
-    status: 'Active',
-    role: 'Site Coord.',
-    startDate: '10/03/2024',
-    endDate: '10/10/2024',
-    trial: 'Clinical Trial 1'
+    name: 'GN01',
+    status: 'Inactive',
+    phase: 'Diabetes',
+    participants: 200,
+    startDate: '10/03/2023',
+    endDate: '10/12/2023',
+    principalInvestigator: 'Dr. Emily Rodriguez',
+    sites: 15
   },
   {
     id: '4',
-    firstName: 'Selina',
-    lastName: 'Abernathy',
-    email: 'Selina.Abernathy@domain.ext',
+    name: 'GX7D',
     status: 'Active',
-    role: 'Site Coord.',
-    startDate: '05/04/2024',
-    endDate: '05/09/2024',
-    trial: 'Clinical Trial 1'
+    phase: 'Diabetes ',
+    participants: 45,
+    startDate: '05/05/2024',
+    endDate: '05/12/2024',
+    principalInvestigator: 'Dr. David Wilson',
+    sites: 5
   },
   {
     id: '5',
-    firstName: 'Lyda',
-    lastName: 'Gulgowski',
-    email: 'Lyda.Gulgowski@domain.ext',
-    status: 'Active',
-    role: 'Site Coord.',
-    startDate: '12/05/2024',
-    endDate: '12/08/2024',
-    trial: 'Clinical Trial 1'
-  },
-  {
-    id: '6',
-    firstName: 'Lola',
-    lastName: 'Rutherford',
-    email: 'Lola.Rutherford@domain.ext',
+    name: 'GZ9K',
     status: 'Inactive',
-    role: 'Site Coord.',
-    startDate: '01/06/2024',
-    endDate: '01/07/2024',
-    trial: 'Clinical Trial 1'
-  },
-  // Clinical Trial 2 users (20 records - adding some sample ones)
-  {
-    id: '7',
-    firstName: 'John',
-    lastName: 'Smith',
-    email: 'John.Smith@domain.ext',
-    status: 'Active',
-    role: 'Study Coord.',
-    startDate: '01/01/2024',
-    endDate: '31/12/2024',
-    trial: 'Clinical Trial 2'
-  },
-  {
-    id: '8',
-    firstName: 'Jane',
-    lastName: 'Doe',
-    email: 'Jane.Doe@domain.ext',
-    status: 'Active',
-    role: 'Site Coord.',
-    startDate: '15/02/2024',
-    endDate: '15/11/2024',
-    trial: 'Clinical Trial 2'
-  },
-  {
-    id: '9',
-    firstName: 'Bob',
-    lastName: 'Johnson',
-    email: 'Bob.Johnson@domain.ext',
-    status: 'Inactive',
-    role: 'Admin',
-    startDate: '01/03/2024',
-    endDate: '30/06/2024',
-    trial: 'Clinical Trial 2'
-  },
-  {
-    id: '10',
-    firstName: 'Alice',
-    lastName: 'Brown',
-    email: 'Alice.Brown@domain.ext',
-    status: 'Active',
-    role: 'User',
-    startDate: '10/04/2024',
-    endDate: '10/10/2024',
-    trial: 'Clinical Trial 2'
+    phase: 'Diabetes',
+    participants: 120,
+    startDate: '01/01/2023',
+    endDate: '01/06/2024',
+    principalInvestigator: 'Dr. Robert Taylor',
+    sites: 6
   }
 ]
 
-interface NewUser {
-  firstName: string
-  lastName: string
-  email: string
-  role: string
-  clinicalTrial: string
-}
-
-interface FormErrors {
-  [key: string]: string
-}
-
-interface SearchUser {
-  id: string
-  firstName: string
-  lastName: string
-  email: string
-  status: string
-  role: string
-  startDate: string
-  endDate: string
-  trial: string
-}
-
-export default function AddUserPage() {
-  const [newUser, setNewUser] = useState<NewUser>({
-    firstName: '',
-    lastName: '',
-    email: '',
-    role: '',
-    clinicalTrial: ''
-  })
-  const [formErrors, setFormErrors] = useState<FormErrors>({})
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
-  const [availableTrials, setAvailableTrials] = useState<string[]>([
-    'Clinical Trial 1',
-    'Clinical Trial 2'
-  ])
-  const [selectedTrials, setSelectedTrials] = useState<string[]>([''])
-  const [userSearch, setUserSearch] = useState<string>('')
-  const [searchResults, setSearchResults] = useState<SearchUser[]>([])
-  const [showSearchResults, setShowSearchResults] = useState<boolean>(false)
-  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false)
-  const [submittedUser, setSubmittedUser] = useState<NewUser | null>(null)
+export default function ClinicalTrialsPage() {
   const router = useRouter()
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [phaseFilter, setPhaseFilter] = useState('')
+  const [fromDate, setFromDate] = useState<Date | null>(null)
+  const [toDate, setToDate] = useState<Date | null>(null)
+  const [showDropdown, setShowDropdown] = useState<string | null>(null)
+  const [showDeactivateModal, setShowDeactivateModal] = useState<boolean>(false)
+  const [trialToDeactivate, setTrialToDeactivate] = useState<ClinicalTrial | null>(null)
+  const [trials, setTrials] = useState<ClinicalTrial[]>(clinicalTrials)
 
-  const isRoleAdminLike = (role: string) => role === 'Admin' || role === 'Superadmin'
-
-  // Function to get clinical trial users
-  const getClinicalTrialUsers = (): SearchUser[] => {
-    return clinicalTrialUsers
+  const handleTrialAction = (trial: ClinicalTrial, event: React.MouseEvent) => {
+    event.stopPropagation()
+    setShowDropdown(showDropdown === trial.id ? null : trial.id)
   }
 
-  const validateForm = () => {
-    const errors: FormErrors = {}
-    
-    if (!newUser.firstName.trim()) {
-      errors.firstName = 'First name is required'
-    }
-    
-    if (!newUser.lastName.trim()) {
-      errors.lastName = 'Last name is required'
-    }
-    
-    if (!newUser.email.trim()) {
-      errors.email = 'Email is required'
-    } else if (!/\S+@\S+\.\S+/.test(newUser.email)) {
-      errors.email = 'Email is invalid'
-    }
-    
-    if (!newUser.role) {
-      errors.role = 'Role is required'
-    }
-    
-    // Clinical trials are required only for non-admin roles
-    if (!isRoleAdminLike(newUser.role)) {
-      if (!selectedTrials.some(trial => trial.trim())) {
-        errors.clinicalTrial = 'At least one clinical trial is required'
-      }
-    }
-    
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
+  const handleEditTrial = (trial: ClinicalTrial) => {
+    console.log('Edit Trial button clicked, navigating to /add-clinical-trial?edit=' + trial.id)
+    router.push(`/add-clinical-trial?edit=${trial.id}`)
+    setShowDropdown(null)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    console.log('=== FORM SUBMISSION DEBUG ===')
-    console.log('Form submitted with data:', newUser)
-    console.log('Selected trials:', selectedTrials)
-    console.log('Form errors before validation:', formErrors)
-    
-    const isValid = validateForm()
-    console.log('Form is valid:', isValid)
-    console.log('Form errors after validation:', formErrors)
-    
-    if (!isValid) {
-      console.log('Form validation failed, stopping submission')
-      return
-    }
+  const closeDropdown = () => setShowDropdown(null)
 
-    console.log('Starting form submission...')
-    setIsSubmitting(true)
-    
-    try {
-      // Simulate API call
-      console.log('Simulating API call...')
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      const userWithTrials = {
-        ...newUser,
-        clinicalTrials: selectedTrials.filter(trial => trial.trim())
-      }
-      
-      console.log('Successfully added new user:', userWithTrials)
-      
-      // Store submitted user data and show success modal
-      setSubmittedUser({
-        ...newUser,
-        clinicalTrial: selectedTrials.filter(trial => trial.trim()).join(', ')
-      })
-      setShowSuccessModal(true)
-      
-      // Reset form
-      setNewUser({
-        firstName: '',
-        lastName: '',
-        email: '',
-        role: '',
-        clinicalTrial: ''
-      })
-      setSelectedTrials([''])
-      console.log('Form reset completed')
-    } catch (error) {
-      console.error('Error adding user:', error)
-    } finally {
-      setIsSubmitting(false)
-      console.log('Form submission completed')
-    }
+  const handleDeactivateTrial = (trial: ClinicalTrial) => {
+    setTrialToDeactivate(trial)
+    setShowDeactivateModal(true)
+    setShowDropdown(null)
   }
 
-  const handleTrialChange = (index: number, value: string) => {
-    const newTrials = [...selectedTrials]
-    newTrials[index] = value
-    setSelectedTrials(newTrials)
-    
-    // Update the main form data with the first trial
-    if (index === 0) {
-      setNewUser({...newUser, clinicalTrial: value})
-    }
-  }
-
-  const handleAddTrial = () => {
-    if (selectedTrials.length < 5) { // Limit to 5 trials
-      setSelectedTrials([...selectedTrials, ''])
-    }
-  }
-
-  const handleRemoveTrial = (index: number) => {
-    if (selectedTrials.length > 1) {
-      const newTrials = selectedTrials.filter((_, i) => i !== index)
-      setSelectedTrials(newTrials)
-      
-      // Update main form data if we removed the first trial
-      if (index === 0 && newTrials.length > 0) {
-        setNewUser({...newUser, clinicalTrial: newTrials[0]})
-      } else if (newTrials.length === 0) {
-        setNewUser({...newUser, clinicalTrial: ''})
-      }
-    }
-  }
-
-  // Search functionality
-  const handleSearchChange = (value: string) => {
-    setUserSearch(value)
-    
-    if (value.trim().length > 0) {
-      const allUsers = getClinicalTrialUsers()
-      const filtered = allUsers.filter(user => 
-        user.firstName.toLowerCase().includes(value.toLowerCase()) ||
-        user.lastName.toLowerCase().includes(value.toLowerCase()) ||
-        user.email.toLowerCase().includes(value.toLowerCase()) ||
-        user.trial.toLowerCase().includes(value.toLowerCase()) ||
-        user.role.toLowerCase().includes(value.toLowerCase()) ||
-        user.status.toLowerCase().includes(value.toLowerCase())
+  const confirmDeactivate = () => {
+    if (trialToDeactivate) {
+      setTrials(prevTrials => 
+        prevTrials.map(trial => 
+          trial.id === trialToDeactivate.id 
+            ? { ...trial, status: 'Inactive' as const }
+            : trial
+        )
       )
-      setSearchResults(filtered)
-      setShowSearchResults(true)
-    } else {
-      setSearchResults([])
-      setShowSearchResults(false)
+      setShowDeactivateModal(false)
+      setTrialToDeactivate(null)
     }
   }
 
-  // Handle user selection from search results
-  const handleUserSelect = (user: SearchUser) => {
-    setNewUser({
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      role: user.role,
-      clinicalTrial: user.trial
-    })
-    
-    // Set the selected trial
-    setSelectedTrials([user.trial])
-    
-    setUserSearch('')
-    setSearchResults([])
-    setShowSearchResults(false)
+  const cancelDeactivate = () => {
+    setShowDeactivateModal(false)
+    setTrialToDeactivate(null)
   }
 
-  // Close search results when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      if (!target.closest('.search-container')) {
-        setShowSearchResults(false)
+  const parseDate = (dateStr: string): Date | null => {
+    if (!dateStr) return null;
+    // Parse dd/MM/yyyy format
+    const parts = dateStr.split('/').map(Number);
+    if (parts.length === 3) {
+      const [day, month, year] = parts;
+      if (day && month && year) {
+        const d = new Date(year, month - 1, day);
+        if (!isNaN(d.getTime())) return d;
       }
     }
+    return null;
+  };
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
+
+  const filteredTrials = trials.filter(trial => {
+    const searchLower = search.toLowerCase()
+    // Default to display fallbacks when fields are missing so search still works
+    const countryList = ((trial as any).countryRegion ?? ['US', 'PR']) as string[]
+    const languageList = ((trial as any).language ?? ['EN', 'ES']) as string[]
+    const haystack = [
+      trial.name,
+      trial.principalInvestigator,
+      trial.phase,
+      trial.status,
+      countryList.join(', '),
+      languageList.join(', ')
+    ]
+      .filter(Boolean)
+      .map(v => String(v).toLowerCase())
+
+    if (search && !haystack.some(v => v.includes(searchLower))) {
+      return false
     }
-  }, [])
+    if (statusFilter && trial.status !== statusFilter) {
+      return false
+    }
+    if (phaseFilter && !trial.name.toLowerCase().includes(phaseFilter.toLowerCase())) {
+      return false
+    }
+    
+    // Date filtering
+    if (fromDate || toDate) {
+      const trialStartDate = parseDate(trial.startDate);
+      if (trialStartDate) {
+        if (fromDate && trialStartDate < fromDate) return false;
+        if (toDate && trialStartDate > toDate) return false;
+      } else {
+        return false;
+      }
+    }
+    
+    return true
+  })
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Active': return 'bg-green-100 text-green-800'
+      case 'Inactive': return 'bg-red-100 text-red-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  // Unique trial names for dropdown
+  const trialNames = Array.from(new Set(trials.map(t => t.name))).sort()
+
+  const clearFilters = () => {
+    setSearch('')
+    setStatusFilter('')
+    setPhaseFilter('')
+    setFromDate(null)
+    setToDate(null)
+  }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-2">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4">
-          <h1 className="text-lg font-semibold text-gray-900">Add User</h1>
-          <button
-            onClick={() => router.push('/usersPage')}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <X className="h-5 w-5 text-gray-600" />
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          {/* User Lookup Section */}
-          <div className="space-y-3">
-            <div className="relative search-container">
-              <input
-                type="text"
-                value={userSearch}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder="Search name, email"
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              />
-              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              
-              {/* Search Results Dropdown */}
-              {showSearchResults && searchResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
-                  {searchResults.map((user) => (
-                    <div
-                      key={user.id}
-                      onClick={() => handleUserSelect(user)}
-                      className="px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium text-sm text-gray-900">
-                            {user.firstName} {user.lastName}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {user.email} • {user.trial}
-                          </div>
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            user.status === 'Active' ? 'bg-green-100 text-green-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {user.status}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {/* No Results Message */}
-              {showSearchResults && searchResults.length === 0 && userSearch.trim().length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                  <div className="px-3 py-2 text-sm text-gray-500 text-center">
-                    No users found
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200" />
+    <div className="min-h-screen bg-white">
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <div className="bg-white rounded-3xl shadow-sm">
+          {/* Header */}
+          <div className="px-6 py-3 border-b bg-gray-100 border-gray-200 flex justify-between items-center rounded-t-3xl">
+            <h1 className="text-lg text-gray-900">Admin // Clinical Trials</h1>
+            <div className="flex items-center space-x-3">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-70 pl-8 pr-20 py-2  border border-gray-300 rounded-3xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
               </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-gray-500">or</span>
-              </div>
+                  <button 
+                    onClick={() => router.push('/add-clinical-trial')}
+                    className="bg-[#007fb2] text-white px-3 py-2 rounded-3xl text-sm font-medium flex items-center space-x-1 hover:bg-blue-700"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>Add Trial</span>
+                  </button>
             </div>
           </div>
 
-          {/* Form Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* First Name */}
-            <div>
-              <label className="block text-xs font-medium text-gray-900 mb-1">
-                First Name
-              </label>
-              <input
-                type="text"
-                value={newUser.firstName}
-                onChange={(e) => {
-                  setNewUser({...newUser, firstName: e.target.value})
-                  if (formErrors.firstName) {
-                    setFormErrors({...formErrors, firstName: ''})
-                  }
-                }}
-                className={`w-full px-3 py-2 bg-gray-50 border ${
-                  formErrors.firstName ? 'border-red-500' : 'border-gray-200'
-                } rounded-t-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm`}
-                placeholder=""
+          {/* Filters */}
+          <div className="px-7 py-3 border-b border-gray-200 flex flex-wrap gap-3 items-center text-sm">
+            <span className="font-medium text-gray-700">FILTER</span>
+         
+            <select
+              value={phaseFilter}
+              onChange={(e) => setPhaseFilter(e.target.value)}
+              className="px-2 py-1 h-9 bg-gray-100 border border-gray-300 rounded-md text-sm"
+            >
+              <option value="">Trial Name</option>
+              {trialNames.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-2 py-1 h-9 bg-gray-100 border border-gray-300 rounded-md text-sm"
+            >
+              <option value="">Status</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+            {/* Date Filters */}
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-700">DATE</span>
+              <DatePicker
+                selected={fromDate}
+                onChange={(date: Date | null) => setFromDate(date)}
+                placeholderText="From"
+                className="w-20 h-9 font-normal px-2 text-xs bg-white border rounded-xl"
+                dateFormat="dd/MM/yyyy"
+                popperPlacement="bottom-start"
+                popperClassName="z-50"
+                portalId="root-portal"
               />
-              {formErrors.firstName && (
-                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
-                  Enter first name
-                </div>
-              )}
-            </div>
-
-            {/* Last Name */}
-            <div>
-              <label className="block text-xs font-medium text-gray-900 mb-1">
-                Last Name
-              </label>
-              <input
-                type="text"
-                value={newUser.lastName}
-                onChange={(e) => {
-                  setNewUser({...newUser, lastName: e.target.value})
-                  if (formErrors.lastName) {
-                    setFormErrors({...formErrors, lastName: ''})
-                  }
-                }}
-                className={`w-full px-3 py-2 bg-gray-50 border ${
-                  formErrors.lastName ? 'border-red-500' : 'border-gray-200'
-                } rounded-t-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm`}
-                placeholder=""
+              <DatePicker
+                selected={toDate}
+                onChange={(date: Date | null) => setToDate(date)}
+                placeholderText="To"
+                className="w-20 h-9 font-normal px-2 text-xs bg-white border rounded-xl"
+                dateFormat="dd/MM/yyyy"
+                popperPlacement="bottom-start"
+                popperClassName="z-50"
+                portalId="root-portal"
               />
-              {formErrors.lastName && (
-                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
-                  Enter last name
-                </div>
-              )}
             </div>
-
-            {/* Email */}
-            <div>
-              <label className="block text-xs font-medium text-gray-900 mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                value={newUser.email}
-                onChange={(e) => {
-                  setNewUser({...newUser, email: e.target.value})
-                  if (formErrors.email) {
-                    setFormErrors({...formErrors, email: ''})
-                  }
-                }}
-                className={`w-full px-3 py-2 bg-gray-50 border ${
-                  formErrors.email ? 'border-red-500' : 'border-gray-200'
-                } rounded-t-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm`}
-                placeholder=""
-              />
-              {formErrors.email && (
-                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
-                  Enter email
-                </div>
-              )}
-            </div>
-
-            {/* Role */}
-            <div>
-              <label className="block text-xs font-medium text-gray-900 mb-1">
-                Role
-              </label>
-              <div className="relative">
-                <select
-                  value={newUser.role}
-                  onChange={(e) => {
-                    console.log('Role changed to:', e.target.value)
-                    const role = e.target.value
-                    setNewUser({...newUser, role})
-                    // If admin or superadmin, clear clinical trials selections and related errors
-                    if (role === 'Admin' || role === 'Superadmin') {
-                      setSelectedTrials([''])
-                      if (formErrors.clinicalTrial) {
-                        setFormErrors({...formErrors, clinicalTrial: ''})
-                      }
-                    }
-                    if (formErrors.role) {
-                      setFormErrors({...formErrors, role: ''})
-                    }
-                  }}
-                  className={`w-full px-3 py-2 bg-gray-50 border ${
-                    formErrors.role ? 'border-red-500' : 'border-gray-200'
-                  } rounded-t-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none text-sm`}
-                >
-                  <option value="">Select</option>
-                  <option value="Study Coord.">Study Coordinator</option>
-                  <option value="Site Coord.">Site Coordinator</option>
-                  <option value="Admin">Admin</option>
-                  <option value="Superadmin">Superadmin</option>
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-              </div>
-              {formErrors.role && (
-                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
-                  Select role
-                </div>
-              )}
-            </div>
-
-            {/* Clinical Trials */}
-            {!isRoleAdminLike(newUser.role) && (
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-gray-900 mb-1">
-                Clinical Trials
-              </label>
-              <div className="space-y-2">
-                {selectedTrials.map((trial, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                   
-                    <div className="w-1/2">
-                      <select
-                        value={trial}
-                        onChange={(e) => handleTrialChange(index, e.target.value)}
-                        className={`w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
-                          formErrors.clinicalTrial ? 'border-red-500' : ''
-                        }`}
-                      >
-                        <option value="">Select trial</option>
-                        {availableTrials.map((availableTrial) => (
-                          <option key={availableTrial} value={availableTrial}>
-                            {availableTrial}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {selectedTrials.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTrial(index)}
-                        className="text-gray-400 hover:text-red-500 p-1"
-                      >
-                        🗑
-                      </button>
-                    )}
-                  </div>
-                ))}
-                {/* Clinical trial error above Add trial */}
-                {formErrors.clinicalTrial && (
-                  <div className="mt-2 w-1/2 rounded-lg border border-red-300 bg-white shadow-sm">
-                    <div className="flex items-center gap-3 px-4 py-3 text-gray-800">
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-600 text-sm font-semibold">!</span>
-                      <span className="text-sm">Select a clinical trial</span>
-                    </div>
-                  </div>
-                )}
-
-                {selectedTrials.length < 5 && (
-                  <button
-                    type="button"
-                    onClick={handleAddTrial}
-                    className="w-1/2 mt-2 border border-gray-300 rounded-full px-4 py-1 text-gray-400 flex items-center justify-between hover:bg-gray-50"
-                    aria-label="Add trial"
-                  >
-                    <span className="mx-auto">Add trial</span>
-                    <span className="ml-2 inline-flex items-center justify-center w-7 h-5 rounded-full border border-gray-300 text-gray-400">
-                      <Plus className="w-4 h-4" />
-                    </span>
-                  </button>
-                )}
-              </div>
-            </div>
+            
+            {/* Clear Filters Button */}
+            {(search || statusFilter || phaseFilter || fromDate || toDate) && (
+              <button
+                onClick={clearFilters}
+                className="px-2 py-1 text-xs border rounded-full h-9 flex items-center justify-center"
+              >
+                ✕
+              </button>
             )}
           </div>
 
-          {/* Submit Button */}
-          <div className="flex justify-end pt-6 gap-4">
-         
-              
-         
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex items-center space-x-2 px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <span>Submit</span>
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="px-7 min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-7 py-2 text-left text-xs font-medium text-gray-500 uppercase">Trial Code</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Disease State</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Country/Region</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Languages</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Start Date</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">End Date</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase"></th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredTrials.map((trial) => (
+                  <tr key={trial.id} className="hover:bg-gray-50">
+                    <td className="px-7 py-2 text-sm font-medium text-gray-900">{trial.name}</td>
+                    <td className="px-3 py-2 text-sm text-gray-900">{trial.phase}</td>
+                    <td className="px-3 py-2 text-sm text-gray-900">
+                      {(trial as any).countryRegion ? (trial as any).countryRegion.join(', ') : 'US, PR'}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-900">
+                      {(trial as any).language ? (trial as any).language.join(', ') : 'EN, ES'}
+                    </td>
+                    <td className="px-3 py-2 flex items-center space-x-1">
+                      <div className={`w-2 h-2 rounded-full ${trial.status === 'Active' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                      <span className="text-xs">{trial.status}</span>
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-900">{trial.startDate}</td>
+                    <td className="px-3 py-2 text-sm text-gray-900">{trial.endDate}</td>
+                    <td className="px-3 py-2 relative">
+                      <button
+                        onClick={(e) => handleTrialAction(trial, e)}
+                        className="p-1 hover:bg-gray-100 rounded"
+                      >
+                        <MoreVertical className="h-3 w-3 text-gray-400" />
+                      </button>
+                      {showDropdown === trial.id && (
+                        <div className="absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg z-10 border text-xs">
+                          <button 
+                            onClick={() => handleEditTrial(trial)}
+                            className="block w-full text-left px-3 py-1 text-gray-700 hover:bg-gray-100"
+                          >
+                            Edit
+                          </button>
+                          <button 
+                            onClick={() => handleDeactivateTrial(trial)}
+                            className="block w-full text-left px-3 py-1 text-gray-700 hover:bg-gray-100"
+                          >
+                            Deactivate
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </form>
+
+          {/* No Results */}
+          {filteredTrials.length === 0 && (
+            <div className="text-center py-8">
+              <div className="text-gray-500 text-sm">No clinical trials found matching your criteria</div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Success Modal */}
-      {showSuccessModal && submittedUser && (
+      {/* Deactivate Confirmation Modal */}
+      {showDeactivateModal && trialToDeactivate && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Add User</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Deactivate Clinical Trial</h2>
               <button
-                onClick={() => setShowSuccessModal(false)}
+                onClick={cancelDeactivate}
                 className="p-2 hover:bg-gray-100 rounded-full transition-colors"
               >
                 <X className="h-5 w-5 text-gray-600" />
               </button>
             </div>
 
-            {/* Success Content */}
+            {/* Modal Content */}
             <div className="p-6">
-              {/* Success Message */}
               <div className="text-center mb-6">
-                <div className="flex items-center justify-center mb-3">
-                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
                 </div>
-                <h3 className="text-lg font-medium text-gray-900">User has been added</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Are you sure?</h3>
+                <p className="text-sm text-gray-600">
+                  You are about to deactivate <strong>{trialToDeactivate.name}</strong>. 
+                  This action will change the trial status to Inactive.
+                </p>
               </div>
 
-              {/* Divider */}
-              <div className="border-t border-gray-200 mb-6"></div>
-
-              {/* User Details */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                {/* Left Column - User Info */}
-                <div>
-                  <div className="font-semibold text-gray-900 text-sm mb-1">
-                    {submittedUser.firstName} {submittedUser.lastName}
+              {/* Trial Details */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Trial Name:</span>
+                    <div className="font-medium text-gray-900">{trialToDeactivate.name}</div>
                   </div>
-                  <div className="text-xs text-gray-600">
-                    {submittedUser.email}
+                  <div>
+                    <span className="text-gray-500">Phase:</span>
+                    <div className="font-medium text-gray-900">{trialToDeactivate.phase}</div>
                   </div>
-                </div>
-
-                {/* Right Column - Role and Trials */}
-                <div>
-                  <div className="font-semibold text-gray-900 text-sm mb-1">
-                    {submittedUser.role}
+                  <div>
+                    <span className="text-gray-500">Participants:</span>
+                    <div className="font-medium text-gray-900">{trialToDeactivate.participants}</div>
                   </div>
-                  <div className="text-xs text-gray-600 space-y-1">
-                    {submittedUser.clinicalTrial.split(', ').map((trial, index) => (
-                      <div key={index}>{trial}</div>
-                    ))}
+                  <div>
+                    <span className="text-gray-500">Sites:</span>
+                    <div className="font-medium text-gray-900">{trialToDeactivate.sites}</div>
                   </div>
                 </div>
               </div>
 
-              {/* Close Button */}
-              <div className="flex justify-end">
+              {/* Action Buttons */}
+              <div className="flex space-x-3">
                 <button
-                  onClick={() => setShowSuccessModal(false)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  onClick={cancelDeactivate}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  <span>Close</span>
-                  <X className="h-4 w-4" />
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeactivate}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Deactivate Trial
                 </button>
               </div>
             </div>
