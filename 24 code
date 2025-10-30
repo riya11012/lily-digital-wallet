@@ -1,241 +1,554 @@
 'use client'
 
-import { useState } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { X, Calendar, ChevronDown } from 'lucide-react'
+import DatePicker from 'react-datepicker'
+import 'react-datepicker/dist/react-datepicker.css'
 
-export default function ProfilePage() {
-  const { user, updateProfile } = useAuth()
+interface ClinicalTrial {
+  id: string
+  name: string
+  status: 'Active' | 'Inactive'
+  phase: string
+  participants: number
+  startDate: string
+  endDate: string
+  principalInvestigator: string
+  sites: number
+}
 
+// Mock data for existing clinical trials
+const existingClinicalTrials: ClinicalTrial[] = [
+  {
+    id: '1',
+    name: 'GSXK Diabetes Study',
+    status: 'Active',
+    phase: 'Phase III',
+    participants: 150,
+    startDate: '15/01/2024',
+    endDate: '15/12/2024',
+    principalInvestigator: 'Dr. Sarah Johnson',
+    sites: 12
+  },
+  {
+    id: '2',
+    name: 'GKR4 Oncology Trial',
+    status: 'Active',
+    phase: 'Phase II',
+    participants: 85,
+    startDate: '20/02/2024',
+    endDate: '20/11/2024',
+    principalInvestigator: 'Dr. Michael Chen',
+    sites: 8
+  },
+  {
+    id: '3',
+    name: 'GYDG Cardiovascular Study',
+    status: 'Inactive',
+    phase: 'Phase III',
+    participants: 200,
+    startDate: '10/03/2023',
+    endDate: '10/12/2023',
+    principalInvestigator: 'Dr. Emily Rodriguez',
+    sites: 15
+  }
+]
 
-  const [currentPassword, setCurrentPassword] = useState<string>('')
-  const [newPassword, setNewPassword] = useState<string>('')
-  const [retypePassword, setRetypePassword] = useState<string>('')
+type FormErrors = Record<string, string>
 
-  const [showCurrent, setShowCurrent] = useState<boolean>(false)
-  const [showNew, setShowNew] = useState<boolean>(false)
-  const [showRetype, setShowRetype] = useState<boolean>(false)
+export default function AddClinicalTrialPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const editId = searchParams.get('edit')
+  
+  const [isEditing, setIsEditing] = useState(false)
+  const [formData, setFormData] = useState({
+    trialCode: '',
+    diseaseState: '',
+    countryRegion: [] as string[],
+    language: [] as string[],
+    startDate: null as Date | null,
+    endDate: null as Date | null
+  })
+  const [formErrors, setFormErrors] = useState<FormErrors>({})
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false)
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const countryRef = useRef<HTMLDivElement>(null)
+  const languageRef = useRef<HTMLDivElement>(null)
 
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [submitting, setSubmitting] = useState<boolean>(false)
-  const [success, setSuccess] = useState<string>('')
-  const [failure, setFailure] = useState<string>('')
+  // Load trial data when editing
+  useEffect(() => {
+    if (editId) {
+      const trial = existingClinicalTrials.find(t => t.id === editId)
+      if (trial) {
+        // Parse dates from DD/MM/YYYY format
+        const parseDate = (dateStr: string): Date | null => {
+          if (!dateStr) return null;
+          const parts = dateStr.split('/').map(Number);
+          if (parts.length === 3) {
+            const [day, month, year] = parts;
+            if (day && month && year) {
+              const d = new Date(year, month - 1, day);
+              if (!isNaN(d.getTime())) return d;
+            }
+          }
+          return null;
+        };
 
-  const validatePassword = (password: string) => {
-    const minLength = password.length >= 8
-    const hasLetter = /[a-zA-Z]/.test(password)
-    const hasNumber = /\d/.test(password)
-    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password)
-    return minLength && hasLetter && hasNumber && hasSpecial
+        setFormData({
+          trialCode: trial.name,
+          diseaseState: trial.phase,
+          countryRegion: ['US'], // Default for now
+          language: ['English'], // Default for now
+          startDate: parseDate(trial.startDate),
+          endDate: parseDate(trial.endDate)
+        })
+        setIsEditing(true)
+      }
+    }
+  }, [editId])
+
+  const handleInputChange = (field: string, value: string | Date | null) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+    if (formErrors[field]) {
+      setFormErrors(prev => ({ ...prev, [field]: '' }))
+    }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleMultiSelect = (field: 'countryRegion' | 'language', value: string) => {
+    setFormData(prev => {
+      const nextValues = prev[field].includes(value)
+        ? prev[field].filter(item => item !== value)
+        : [...prev[field], value]
+      return {
+        ...prev,
+        [field]: nextValues
+      }
+    })
+    if (formErrors[field]) {
+      setFormErrors(prev => ({ ...prev, [field]: '' }))
+    }
+  }
+
+  const countryOptions = [
+    { value: 'US', label: 'United States (US)' },
+    { value: 'PR', label: 'Puerto Rico (PR)' },
+    { value: 'CA', label: 'Canada (CA)' },
+    { value: 'UK', label: 'United Kingdom (UK)' },
+    { value: 'DE', label: 'Germany (DE)' },
+    { value: 'FR', label: 'France (FR)' },
+    { value: 'AU', label: 'Australia (AU)' },
+    { value: 'JP', label: 'Japan (JP)' },
+    { value: 'IN', label: 'India (IN)' },
+    { value: 'BR', label: 'Brazil (BR)' },
+    { value: 'MX', label: 'Mexico (MX)' }
+  ]
+
+  const languageOptions = [
+    { value: 'EN', label: 'English (EN)' },
+    { value: 'ES', label: 'Español (ES)' },
+    { value: 'FR', label: 'Français (FR)' },
+    { value: 'DE', label: 'Deutsch (DE)' },
+    { value: 'IT', label: 'Italiano (IT)' },
+    { value: 'PT', label: 'Português (PT)' },
+    { value: 'JA', label: '日本語 (JA)' },
+    { value: 'KO', label: '한국어 (KO)' },
+    { value: 'ZH', label: '中文 (ZH)' },
+    { value: 'HI', label: 'हिन्दी (HI)' }
+  ]
+
+  const validateForm = (): boolean => {
+    const errors: FormErrors = {}
+
+    if (!String(formData.trialCode).trim()) {
+      errors.trialCode = 'Enter trial code'
+    }
+    if (!String(formData.diseaseState).trim()) {
+      errors.diseaseState = 'Enter disease state'
+    }
+    if (!formData.countryRegion.length) {
+      errors.countryRegion = 'Select country/region'
+    }
+    if (!formData.language.length) {
+      errors.language = 'Select language'
+    }
+    if (!formData.startDate) {
+      errors.startDate = 'Select start date'
+    }
+    if (!formData.endDate) {
+      errors.endDate = 'Select end date'
+    }
+
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    setSuccess('')
-    setFailure('')
-    setErrors({})
 
-    const newErrors: Record<string, string> = {}
-
-    // Show errors for all password fields
-    if (!currentPassword) {
-      newErrors.currentPassword = 'Please enter your current password'
+    const isValid = validateForm()
+    if (!isValid) return
+    
+    // Format date helper
+    const formatDate = (date: Date): string => {
+      const day = String(date.getDate()).padStart(2, '0')
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const year = String(date.getFullYear())
+      return `${day}/${month}/${year}`
     }
-    if (!newPassword) {
-      newErrors.newPassword = 'Please enter 8+ characters. Include numbers and special characters.'
-    } else if (!validatePassword(newPassword)) {
-      newErrors.newPassword = 'Please enter 8+ characters. Include numbers and special characters.'
+    
+    // Create new trial object
+    const newTrial = {
+      id: isEditing ? editId! : String(Date.now()),
+      name: formData.trialCode,
+      status: 'Active' as 'Active' | 'Inactive',
+      phase: formData.diseaseState,
+      participants: Math.floor(Math.random() * 200) + 20,
+      startDate: formData.startDate ? formatDate(formData.startDate) : '',
+      endDate: formData.endDate ? formatDate(formData.endDate) : '',
+      principalInvestigator: 'Dr. TBD',
+      sites: Math.floor(Math.random() * 10) + 3,
+      countryRegion: formData.countryRegion,
+      language: formData.language
     }
-    if (!retypePassword) {
-      newErrors.retypePassword = 'Password does not match'
-    } else if (newPassword !== retypePassword) {
-      newErrors.retypePassword = 'Password does not match'
-    }
-
-    if (Object.keys(newErrors).length) {
-      setErrors(newErrors)
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      let passwordOk = true
-      if (newPassword && currentPassword) {
-        // Simulate API call for now - replace with actual API when implemented
-        await new Promise(resolve => setTimeout(resolve, 500))
-        passwordOk = true // Simulate success for now
-        
-        // TODO: Implement actual API call
-        // const resp = await fetch('/api/auth/change-password', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({ currentPassword, newPassword }),
-        // })
-        // passwordOk = resp.ok
-        // if (!passwordOk) {
-        //   const data = await resp.json().catch(() => ({}))
-        //   setFailure(data?.error || 'Failed to change password')
-        // }
+    
+    // Get existing trials
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('clinicalTrials')
+      let existingTrials = stored ? JSON.parse(stored) : existingClinicalTrials
+      
+      // Add or update
+      if (isEditing) {
+        existingTrials = existingTrials.map((t: ClinicalTrial) => 
+          t.id === editId ? newTrial : t
+        )
+      } else {
+        existingTrials.push(newTrial)
       }
-
-      if (passwordOk) {
-        setSuccess('Your password has been updated.')
-        setCurrentPassword('')
-        setNewPassword('')
-        setRetypePassword('')
-      }
-    } catch (err) {
-      setFailure('Something went wrong')
-    } finally {
-      setSubmitting(false)
+      
+      localStorage.setItem('clinicalTrials', JSON.stringify(existingTrials))
     }
+    
+    // Show success modal
+    setShowSuccessModal(true)
   }
+
+  const handleClose = () => {
+    router.push('/clinical-trials')
+  }
+
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false)
+    router.push('/clinical-trials')
+  }
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (countryRef.current && !countryRef.current.contains(event.target as Node)) {
+        setShowCountryDropdown(false)
+      }
+      if (languageRef.current && !languageRef.current.contains(event.target as Node)) {
+        setShowLanguageDropdown(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
 
   return (
-    <div className="flex items-center justify-center min-h-screen px-2 py-2">
-      <div className="bg-white space-x-3  rounded-xl shadow-lg w-full max-w-3xl p-4">
-        <div className="flex  items-start justify-between mb-4">
-         
-          <h1 className="text-xl font-normal text-black">Profile</h1>
-          {success && (
-            <div className="bg-green-600 w-1/2 text-white text-center px-7 py-4 rounded-lg">
-              {success}
-            </div>
-          )}
+    <div className="min-h-screen bg-white flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 relative">
+        {/* Close Button */}
+        <button
+          onClick={handleClose}
+          className="absolute top-6 right-6 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
+        >
+          <X className="w-4 h-4 text-gray-600" />
+        </button>
+
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-gray-900">
+            {isEditing ? 'Edit Clinical Trial' : 'Add Clinical Trial'}
+          </h1>
         </div>
-      
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Left: Your information */}
-          <div className="space-y-2">
-            <h2 className="text-sm font-semibold text-red-600">Your information</h2>
-            <div className="flex flex-col space-y-1">
-              <div className="text-base font-bold text-black">
-                {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : 'Craig Johnston'}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Left Column */}
+            <div className="space-y-6">
+              {/* Trial Code */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Trial Code
+                </label>
+                <input
+                  type="text"
+                  value={formData.trialCode}
+                  onChange={(e) => handleInputChange('trialCode', e.target.value)}
+                  className={`w-full h-10 px-4 bg-gray-100 border ${formErrors.trialCode ? 'border-red-500' : 'border-gray-300'} rounded-t-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                  placeholder=""
+                />
+                {formErrors.trialCode && (
+                  <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
+                    Enter trial code
+                  </div>
+                )}
               </div>
-              <div className="text-sm text-black">
-                {user?.email || 'craig.johnston@eversana.com'}
+
+              {/* Country/Region */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Country/Region
+                </label>
+                <div className="relative" ref={countryRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowCountryDropdown(!showCountryDropdown)}                    className={`w-full h-10 px-4 bg-gray-100 border ${formErrors.countryRegion ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between`}
+                  >
+                    <span className={formData.countryRegion.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
+                      {formData.countryRegion.length === 0 ? 'Select' : `${formData.countryRegion.length} selected`}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                  </button>
+                  
+                  {showCountryDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                      {countryOptions.map((option) => (
+                        <label
+                          key={option.value}
+                          className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={formData.countryRegion.includes(option.value)}
+                            onChange={() => handleMultiSelect('countryRegion', option.value)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="ml-3 text-sm text-gray-700">{option.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {formErrors.countryRegion && (
+                  <div className="mt-2 w-full rounded-lg border border-red-300 bg-white shadow-sm">
+                    <div className="flex items-center gap-3 px-4 py-3 text-gray-800">
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-600 text-sm font-semibold">!</span>
+                      <span className="text-sm">Select country/region</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Start Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Start date
+                </label>
+                <div className="relative">
+                  <DatePicker
+                    selected={formData.startDate}
+                    onChange={(date: Date | null) => handleInputChange('startDate', date)}
+                    placeholderText=""
+                    className={`w-full h-10 px-4 bg-gray-100 border ${formErrors.startDate ? 'border-red-500' : 'border-gray-300'} rounded-t-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                    dateFormat="dd/MM/yyyy"
+                  />
+                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+                {formErrors.startDate && (
+                  <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
+                    Select start date
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              {/* Disease State */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Disease State
+                </label>
+                <input
+                  type="text"
+                  value={formData.diseaseState}
+                  onChange={(e) => handleInputChange('diseaseState', e.target.value)}
+                  className={`w-full h-10 px-4 bg-gray-100 border ${formErrors.diseaseState ? 'border-red-500' : 'border-gray-300'} rounded-t-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                  placeholder=""
+                />
+                {formErrors.diseaseState && (
+                  <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
+                    Enter disease state
+                  </div>
+                )}
+              </div>
+
+              {/* Language */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Language
+                </label>
+                <div className="relative" ref={languageRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                    className={`w-full h-10 px-4 bg-gray-100 border ${formErrors.language ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between`}
+                  >
+                    <span className={formData.language.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
+                      {formData.language.length === 0 ? 'Select' : `${formData.language.length} selected`}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                  </button>
+                  
+                  {showLanguageDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                      {languageOptions.map((option) => (
+                        <label
+                          key={option.value}
+                          className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={formData.language.includes(option.value)}
+                            onChange={() => handleMultiSelect('language', option.value)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="ml-3 text-sm text-gray-700">{option.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {formErrors.language && (
+                  <div className="mt-2 w-full rounded-lg border border-red-300 bg-white shadow-sm">
+                    <div className="flex items-center gap-3 px-4 py-3 text-gray-800">
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-600 text-sm font-semibold">!</span>
+                      <span className="text-sm">Select language</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* End Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  End date
+                </label>
+                <div className="relative">
+                  <DatePicker
+                    selected={formData.endDate}
+                    onChange={(date: Date | null) => handleInputChange('endDate', date)}
+                    placeholderText=""
+                    className={`w-full h-10 px-4 bg-gray-100 border ${formErrors.endDate ? 'border-red-500' : 'border-gray-300'} rounded-t-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                    dateFormat="dd/MM/yyyy"
+                  />
+                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+                {formErrors.endDate && (
+                  <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
+                    Select end date
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Right: Change password */}
-          <div className="space-y-2">
-            <h2 className="text-sm font-semibold text-red-600">Confirm Password</h2>
-            <div>
-              <label className="block text-xs font-bold text-black mb-1">Current Password</label>
-              <div className="relative">
-                <input
-                  type={showCurrent ? 'text' : 'password'}
-                  value={currentPassword}
-                  onChange={(e) => {
-                    setCurrentPassword(e.target.value)
-                    if (errors.currentPassword) {
-                      setErrors(prev => ({ ...prev, currentPassword: '' }))
-                    }
-                  }}
-                  className={`w-full px-2 py-1 border focus:outline-none focus:ring-1 focus:ring-red-500 ${
-                    errors.currentPassword 
-                      ? 'border-red-500 rounded-t' 
-                      : 'border-gray-300 rounded'
-                  }`}
-                  placeholder="Enter current password"
-                />
-                <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500">
-                  {showCurrent ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-              {errors.currentPassword && (
-                <div className="w-full bg-red-600 text-white text-xs px-3 py-2 rounded-b">
-                  {errors.currentPassword}
-                </div>
-              )}
-            </div>
-
-            <h2 className="text-sm font-semibold text-red-600 mt-3">Change Password</h2>
-
-            <div>
-              <label className="block text-xs font-bold text-black mb-1">New Password</label>
-              <div className="relative">
-                <input
-                  type={showNew ? 'text' : 'password'}
-                  value={newPassword}
-                  onChange={(e) => {
-                    setNewPassword(e.target.value)
-                    if (errors.newPassword) {
-                      setErrors(prev => ({ ...prev, newPassword: '' }))
-                    }
-                  }}
-                  className={`w-full px-2 py-1 border focus:outline-none focus:ring-1 focus:ring-red-500 ${
-                    errors.newPassword 
-                      ? 'border-red-500 rounded-t' 
-                      : 'border-gray-300 rounded'
-                  }`}
-                  placeholder="Enter new password"
-                />
-                <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500">
-                  {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-              {errors.newPassword && (
-                <div className="w-full bg-red-600 text-white text-xs px-3 py-2 rounded-b">
-                  {errors.newPassword}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-black mb-1">Retype Password</label>
-              <div className="relative">
-                <input
-                  type={showRetype ? 'text' : 'password'}
-                  value={retypePassword}
-                  onChange={(e) => {
-                    setRetypePassword(e.target.value)
-                    if (errors.retypePassword) {
-                      setErrors(prev => ({ ...prev, retypePassword: '' }))
-                    }
-                  }}
-                  className={`w-full px-2 py-1 border focus:outline-none focus:ring-1 focus:ring-red-500 ${
-                    errors.retypePassword 
-                      ? 'border-red-500 rounded-t' 
-                      : 'border-gray-300 rounded'
-                  }`}
-                  placeholder="Retype new password"
-                />
-                <button type="button" onClick={() => setShowRetype(!showRetype)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500">
-                  {showRetype ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-              {errors.retypePassword && (
-                <div className="w-full bg-red-600 text-white text-xs px-3 py-2 rounded-b">
-                  {errors.retypePassword}
-                </div>
-              )}
-            </div>
-
-            <p className="text-xs text-gray-600">Your password should be at least 8 characters long and include a mix of letters, numbers, and special characters (like !, $, or #).</p>
+          {/* Submit Button */}
+          <div className="flex justify-end pt-6">
+            <button
+              type="submit"
+              className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg font-medium flex items-center space-x-2 transition-colors"
+            >
+              <span>Submit</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
           </div>
-        </div>
-
-        {failure && (
-          <div className="mt-6 p-3 rounded bg-red-50 text-red-700">
-            {failure}
-          </div>
-        )}
-
-        <div className="flex justify-end mt-4">
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className={`bg-gray-200 text-black px-4 py-2 rounded-full flex items-center gap-2 text-sm ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            submit
-            <span className="ml-1">›</span>
-          </button>
-        </div>
+        </form>
       </div>
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative">
+            {/* Close Button */}
+            <button
+              onClick={handleSuccessModalClose}
+              className="absolute top-4 right-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
+            >
+              <X className="w-4 h-4 text-gray-600" />
+            </button>
+
+            {/* Header */}
+            <div className="mb-4">
+              <h2 className="text-xl font-bold text-gray-900">{isEditing ? 'Edit Clinical Trial' : 'Add Clinical Trial'}</h2>
+            </div>
+
+            <hr className="border-gray-200 mb-4" />
+
+            {/* Success Message */}
+            <div className="flex items-center justify-center mb-6">
+              <div className="bg-green-100 rounded-full p-2 mr-3">
+                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <p className="text-lg font-bold text-gray-900">{isEditing ? 'Clinical Trial has been edited' : 'Clinical Trial has been added'}</p>
+            </div>
+
+            <hr className="border-gray-200 mb-6" />
+
+            {/* Trial Details */}
+            <div className="grid grid-cols-2 gap-y-2 text-sm mb-6">
+              <div>
+                <p className="font-bold text-gray-900">{formData.trialCode || 'GSXL Diabetes'}</p>
+                <p className="text-gray-700">
+                  {formData.countryRegion.length > 0
+                    ? countryOptions.filter(opt => formData.countryRegion.includes(opt.value)).map(opt => opt.label.split(' ')[0]).join(', ')
+                    : 'United States'}
+                </p>
+                <p className="text-gray-700">
+                  {formData.language.length > 0
+                    ? languageOptions.filter(opt => formData.language.includes(opt.value)).map(opt => opt.label.split(' ')[0]).join(', ')
+                    : 'English, Español'}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="font-bold text-gray-900">
+                  Start Date: {formData.startDate ? formData.startDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '10/20/24'}
+                </p>
+                <p className="font-bold text-gray-900">
+                  End Date: {formData.endDate ? formData.endDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '9/30/26'}
+                </p>
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <div className="flex justify-end">
+              <button
+                onClick={handleSuccessModalClose}
+                className="bg-red-600 text-white px-6 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 hover:bg-red-700 transition-colors"
+              >
+                <span>Close</span>
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
-
-
