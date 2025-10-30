@@ -1,1776 +1,201 @@
-AddUser
+layout.tsx
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import Header from './components/Header';
+import AuthProviderWrapper from '../components/AuthProviderWrapper';
+
+const inter = Inter({ subsets: ['latin'] });
+
+export const metadata: Metadata = {
+  title: 'Lilly Digital Wallet',
+  description: 'Send vouchers and copay cards to mobile numbers',
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+
+  // ✅ Footer component
+  const Footer: React.FC = () => {
+    return (
+      <footer className="fixed bottom-0 left-0 w-full bg-[#D31610] py-4 px-8 flex items-center justify-between text-sm md:text-lg text-white shadow">
+        <img src="/default.jpeg" alt="Logo" className="h-10 w-auto" />
+        <div className="flex flex-wrap gap-6">
+          <a href="#" className="hover:underline">
+            Contact Us
+          </a>
+          <a href="#" className="hover:underline">
+            Terms of Use
+          </a>
+          <a href="#" className="hover:underline">
+            Privacy Statement
+          </a>
+        </div>
+      
+      </footer>
+    );
+  };
+
+  return (
+    <html lang="en">
+      <body className={`${inter.className} bg-gray-100 text-black`}>
+        {/* Header */}
+        <Header />
+
+        {/* Main scrollable content */}
+        <main className="mt-[80px] bg-white mb-[100px] px-6 overflow-y-auto">
+          <AuthProviderWrapper>
+            {children}
+          </AuthProviderWrapper>
+        </main>
+
+        {/* Footer */}
+        <Footer />
+      </body>
+    </html>
+  );
+}
+
+
+Authp.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { Search, X, ChevronDown, Plus } from 'lucide-react'
-// Clinical trial users data from the Admin Users page
-const clinicalTrialUsers = [
-  // Clinical Trial 1 users
-  {
-    id: '1',
-    firstName: 'Audra',
-    lastName: 'Luettgen',
-    email: 'Audra.Luettgen@domain.ext',
-    status: 'Active',
-    role: 'Study Coord.',
-    startDate: '15/01/2024',
-    endDate: '15/12/2024',
-    trial: 'Clinical Trial 1'
-  },
-  {
-    id: '2',
-    firstName: 'Augustus',
-    lastName: 'Daugherty',
-    email: 'Augustus.Daugherty@domain.ext',
-    status: 'Active',
-    role: 'Site Coord.',
-    startDate: '20/02/2024',
-    endDate: '20/11/2024',
-    trial: 'Clinical Trial 1'
-  },
-  {
-    id: '3',
-    firstName: 'Dessie',
-    lastName: 'Grady',
-    email: 'Dessie.Grady@domain.ext',
-    status: 'Active',
-    role: 'Site Coord.',
-    startDate: '10/03/2024',
-    endDate: '10/10/2024',
-    trial: 'Clinical Trial 1'
-  },
-  {
-    id: '4',
-    firstName: 'Selina',
-    lastName: 'Abernathy',
-    email: 'Selina.Abernathy@domain.ext',
-    status: 'Active',
-    role: 'Site Coord.',
-    startDate: '05/04/2024',
-    endDate: '05/09/2024',
-    trial: 'Clinical Trial 1'
-  },
-  {
-    id: '5',
-    firstName: 'Lyda',
-    lastName: 'Gulgowski',
-    email: 'Lyda.Gulgowski@domain.ext',
-    status: 'Active',
-    role: 'Site Coord.',
-    startDate: '12/05/2024',
-    endDate: '12/08/2024',
-    trial: 'Clinical Trial 1'
-  },
-  {
-    id: '6',
-    firstName: 'Lola',
-    lastName: 'Rutherford',
-    email: 'Lola.Rutherford@domain.ext',
-    status: 'Inactive',
-    role: 'Site Coord.',
-    startDate: '01/06/2024',
-    endDate: '01/07/2024',
-    trial: 'Clinical Trial 1'
-  },
-  // Clinical Trial 2 users (20 records - adding some sample ones)
-  {
-    id: '7',
-    firstName: 'John',
-    lastName: 'Smith',
-    email: 'John.Smith@domain.ext',
-    status: 'Active',
-    role: 'Study Coord.',
-    startDate: '01/01/2024',
-    endDate: '31/12/2024',
-    trial: 'Clinical Trial 2'
-  },
-  {
-    id: '8',
-    firstName: 'Jane',
-    lastName: 'Doe',
-    email: 'Jane.Doe@domain.ext',
-    status: 'Active',
-    role: 'Site Coord.',
-    startDate: '15/02/2024',
-    endDate: '15/11/2024',
-    trial: 'Clinical Trial 2'
-  },
-  {
-    id: '9',
-    firstName: 'Bob',
-    lastName: 'Johnson',
-    email: 'Bob.Johnson@domain.ext',
-    status: 'Inactive',
-    role: 'Admin',
-    startDate: '01/03/2024',
-    endDate: '30/06/2024',
-    trial: 'Clinical Trial 2'
-  },
-  {
-    id: '10',
-    firstName: 'Alice',
-    lastName: 'Brown',
-    email: 'Alice.Brown@domain.ext',
-    status: 'Active',
-    role: 'User',
-    startDate: '10/04/2024',
-    endDate: '10/10/2024',
-    trial: 'Clinical Trial 2'
-  }
-]
+import { AuthProvider } from '@/contexts/AuthContext'
 
-interface NewUser {
-  firstName: string
-  lastName: string
-  email: string
-  role: string
-  clinicalTrial: string
+export default function AuthProviderWrapper({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return <AuthProvider>{children}</AuthProvider>
 }
 
-interface FormErrors {
-  [key: string]: string
+auth context
+'use client'
+
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { User, AuthContextType, ProfileUpdateData } from '@/types/auth'
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+interface AuthProviderProps {
+  children: ReactNode
 }
 
-interface SearchUser {
-  id: string
-  firstName: string
-  lastName: string
-  email: string
-  status: string
-  role: string
-  startDate: string
-  endDate: string
-  trial: string
-}
+export function AuthProvider({ children }: AuthProviderProps) {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState<boolean>(true)
 
-export default function AddUserPage() {
-  const [newUser, setNewUser] = useState<NewUser>({
-    firstName: '',
-    lastName: '',
-    email: '',
-    role: '',
-    clinicalTrial: ''
-  })
-  const [formErrors, setFormErrors] = useState<FormErrors>({})
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
-  const [availableTrials, setAvailableTrials] = useState<string[]>([
-    'Clinical Trial 1',
-    'Clinical Trial 2'
-  ])
-  const [selectedTrials, setSelectedTrials] = useState<string[]>([''])
-  const [userSearch, setUserSearch] = useState<string>('')
-  const [searchResults, setSearchResults] = useState<SearchUser[]>([])
-  const [showSearchResults, setShowSearchResults] = useState<boolean>(false)
-  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false)
-  const [submittedUser, setSubmittedUser] = useState<NewUser | null>(null)
-  const router = useRouter()
-
-  const isRoleAdminLike = (role: string) => role === 'Admin' || role === 'Superadmin'
-
-  // Function to get clinical trial users
-  const getClinicalTrialUsers = (): SearchUser[] => {
-    return clinicalTrialUsers
-  }
-
-  const validateForm = () => {
-    const errors: FormErrors = {}
-    
-    if (!newUser.firstName.trim()) {
-      errors.firstName = 'First name is required'
-    }
-    
-    if (!newUser.lastName.trim()) {
-      errors.lastName = 'Last name is required'
-    }
-    
-    if (!newUser.email.trim()) {
-      errors.email = 'Email is required'
-    } else if (!/\S+@\S+\.\S+/.test(newUser.email)) {
-      errors.email = 'Email is invalid'
-    }
-    
-    if (!newUser.role) {
-      errors.role = 'Role is required'
-    }
-    
-    // Clinical trials are required only for non-admin roles
-    if (!isRoleAdminLike(newUser.role)) {
-      if (!selectedTrials.some(trial => trial.trim())) {
-        errors.clinicalTrial = 'At least one clinical trial is required'
-      }
-    }
-    
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    console.log('=== FORM SUBMISSION DEBUG ===')
-    console.log('Form submitted with data:', newUser)
-    console.log('Selected trials:', selectedTrials)
-    console.log('Form errors before validation:', formErrors)
-    
-    const isValid = validateForm()
-    console.log('Form is valid:', isValid)
-    console.log('Form errors after validation:', formErrors)
-    
-    if (!isValid) {
-      console.log('Form validation failed, stopping submission')
-      return
-    }
-
-    console.log('Starting form submission...')
-    setIsSubmitting(true)
-    
-    try {
-      // Simulate API call
-      console.log('Simulating API call...')
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      const userWithTrials = {
-        ...newUser,
-        clinicalTrials: selectedTrials.filter(trial => trial.trim())
-      }
-      
-      console.log('Successfully added new user:', userWithTrials)
-      
-      // Store submitted user data and show success modal
-      setSubmittedUser({
-        ...newUser,
-        clinicalTrial: selectedTrials.filter(trial => trial.trim()).join(', ')
-      })
-      setShowSuccessModal(true)
-      
-      // Reset form
-      setNewUser({
-        firstName: '',
-        lastName: '',
-        email: '',
-        role: '',
-        clinicalTrial: ''
-      })
-      setSelectedTrials([''])
-      console.log('Form reset completed')
-    } catch (error) {
-      console.error('Error adding user:', error)
-    } finally {
-      setIsSubmitting(false)
-      console.log('Form submission completed')
-    }
-  }
-
-  const handleTrialChange = (index: number, value: string) => {
-    const newTrials = [...selectedTrials]
-    newTrials[index] = value
-    setSelectedTrials(newTrials)
-    
-    // Update the main form data with the first trial
-    if (index === 0) {
-      setNewUser({...newUser, clinicalTrial: value})
-    }
-  }
-
-  const handleAddTrial = () => {
-    if (selectedTrials.length < 5) { // Limit to 5 trials
-      setSelectedTrials([...selectedTrials, ''])
-    }
-  }
-
-  const handleRemoveTrial = (index: number) => {
-    if (selectedTrials.length > 1) {
-      const newTrials = selectedTrials.filter((_, i) => i !== index)
-      setSelectedTrials(newTrials)
-      
-      // Update main form data if we removed the first trial
-      if (index === 0 && newTrials.length > 0) {
-        setNewUser({...newUser, clinicalTrial: newTrials[0]})
-      } else if (newTrials.length === 0) {
-        setNewUser({...newUser, clinicalTrial: ''})
-      }
-    }
-  }
-
-  // Search functionality
-  const handleSearchChange = (value: string) => {
-    setUserSearch(value)
-    
-    if (value.trim().length > 0) {
-      const allUsers = getClinicalTrialUsers()
-      const filtered = allUsers.filter(user => 
-        user.firstName.toLowerCase().includes(value.toLowerCase()) ||
-        user.lastName.toLowerCase().includes(value.toLowerCase()) ||
-        user.email.toLowerCase().includes(value.toLowerCase()) ||
-        user.trial.toLowerCase().includes(value.toLowerCase()) ||
-        user.role.toLowerCase().includes(value.toLowerCase()) ||
-        user.status.toLowerCase().includes(value.toLowerCase())
-      )
-      setSearchResults(filtered)
-      setShowSearchResults(true)
-    } else {
-      setSearchResults([])
-      setShowSearchResults(false)
-    }
-  }
-
-  // Handle user selection from search results
-  const handleUserSelect = (user: SearchUser) => {
-    setNewUser({
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      role: user.role,
-      clinicalTrial: user.trial
-    })
-    
-    // Set the selected trial
-    setSelectedTrials([user.trial])
-    
-    setUserSearch('')
-    setSearchResults([])
-    setShowSearchResults(false)
-  }
-
-  // Close search results when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      if (!target.closest('.search-container')) {
-        setShowSearchResults(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
+    checkAuthStatus()
   }, [])
 
-  return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-2">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4">
-          <h1 className="text-lg font-semibold text-gray-900">Add User</h1>
-          <button
-            onClick={() => router.push('/usersPage')}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <X className="h-5 w-5 text-gray-600" />
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          {/* User Lookup Section */}
-          <div className="space-y-3">
-            <div className="relative search-container">
-              <input
-                type="text"
-                value={userSearch}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder="Search name, email"
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              />
-              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              
-              {/* Search Results Dropdown */}
-              {showSearchResults && searchResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
-                  {searchResults.map((user) => (
-                    <div
-                      key={user.id}
-                      onClick={() => handleUserSelect(user)}
-                      className="px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium text-sm text-gray-900">
-                            {user.firstName} {user.lastName}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {user.email} • {user.trial}
-                          </div>
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            user.status === 'Active' ? 'bg-green-100 text-green-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {user.status}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {/* No Results Message */}
-              {showSearchResults && searchResults.length === 0 && userSearch.trim().length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                  <div className="px-3 py-2 text-sm text-gray-500 text-center">
-                    No users found
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-gray-500">or</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Form Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* First Name */}
-           
-           <div>
-  <label className="block text-xs font-medium text-gray-900 mb-1">
-    First Name
-  </label>
-  <input
-    type="text"
-    value={newUser.firstName}
-    onChange={(e) => {
-      setNewUser({ ...newUser, firstName: e.target.value })
-      if (formErrors.firstName) setFormErrors({ ...formErrors, firstName: '' })
-    }}
-    className={`w-full px-3 py-2 bg-white border ${
-      formErrors.firstName ? 'border-red-600' : 'border-gray-300'
-    } rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm`}
-    placeholder="Enter first name"
-  />
-  {formErrors.firstName && (
-    <p className="text-xs text-red-600 mt-1">{formErrors.firstName}</p>
-  )}
-</div>
-
-
-            {/* Last Name */}
-            <div>
-              <label className="block text-xs font-medium text-gray-900 mb-1">
-                Last Name
-              </label>
-              <input
-                type="text"
-                value={newUser.lastName}
-                onChange={(e) => {
-                  setNewUser({...newUser, lastName: e.target.value})
-                  if (formErrors.lastName) {
-                    setFormErrors({...formErrors, lastName: ''})
-                  }
-                }}
-                className={`w-full px-3 py-2 bg-gray-50 border ${
-                  formErrors.lastName ? 'border-red-500' : 'border-gray-200'
-                } rounded-t-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm`}
-                placeholder=""
-              />
-              {formErrors.lastName && (
-                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
-                  Enter last name
-                </div>
-              )}
-            </div>
-
-            {/* Email */}
-            <div>
-              <label className="block text-xs font-medium text-gray-900 mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                value={newUser.email}
-                onChange={(e) => {
-                  setNewUser({...newUser, email: e.target.value})
-                  if (formErrors.email) {
-                    setFormErrors({...formErrors, email: ''})
-                  }
-                }}
-                className={`w-full px-3 py-2 bg-gray-50 border ${
-                  formErrors.email ? 'border-red-500' : 'border-gray-200'
-                } rounded-t-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm`}
-                placeholder=""
-              />
-              {formErrors.email && (
-                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
-                  Enter email
-                </div>
-              )}
-            </div>
-
-            {/* Role */}
-            <div>
-              <label className="block text-xs font-medium text-gray-900 mb-1">
-                Role
-              </label>
-              <div className="relative">
-                <select
-                  value={newUser.role}
-                  onChange={(e) => {
-                    console.log('Role changed to:', e.target.value)
-                    const role = e.target.value
-                    setNewUser({...newUser, role})
-                    // If admin or superadmin, clear clinical trials selections and related errors
-                    if (role === 'Admin' || role === 'Superadmin') {
-                      setSelectedTrials([''])
-                      if (formErrors.clinicalTrial) {
-                        setFormErrors({...formErrors, clinicalTrial: ''})
-                      }
-                    }
-                    if (formErrors.role) {
-                      setFormErrors({...formErrors, role: ''})
-                    }
-                  }}
-                  className={`w-full px-3 py-2 bg-gray-50 border ${
-                    formErrors.role ? 'border-red-500' : 'border-gray-200'
-                  } rounded-t-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none text-sm`}
-                >
-                  <option value="">Select</option>
-                  <option value="Study Coord.">Study Coordinator</option>
-                  <option value="Site Coord.">Site Coordinator</option>
-                  <option value="Admin">Admin</option>
-                  <option value="Superadmin">Superadmin</option>
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-              </div>
-              {formErrors.role && (
-                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
-                  Select role
-                </div>
-              )}
-            </div>
-
-            {/* Clinical Trials */}
-            {!isRoleAdminLike(newUser.role) && (
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-gray-900 mb-1">
-                Clinical Trials
-              </label>
-              <div className="space-y-2">
-                {selectedTrials.map((trial, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                   
-                    <div className="w-1/2">
-                      <select
-                        value={trial}
-                        onChange={(e) => handleTrialChange(index, e.target.value)}
-                        className={`w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
-                          formErrors.clinicalTrial ? 'border-red-500' : ''
-                        }`}
-                      >
-                        <option value="">Select trial</option>
-                        {availableTrials.map((availableTrial) => (
-                          <option key={availableTrial} value={availableTrial}>
-                            {availableTrial}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {selectedTrials.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTrial(index)}
-                        className="text-gray-400 hover:text-red-500 p-1"
-                      >
-                        🗑
-                      </button>
-                    )}
-                  </div>
-                ))}
-                {/* Clinical trial error above Add trial */}
-                {formErrors.clinicalTrial && (
-                  <div className="mt-2 w-1/2 rounded-lg border border-red-300 bg-white shadow-sm">
-                    <div className="flex items-center gap-3 px-4 py-3 text-gray-800">
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-600 text-sm font-semibold">!</span>
-                      <span className="text-sm">Select a clinical trial</span>
-                    </div>
-                  </div>
-                )}
-
-                {selectedTrials.length < 5 && (
-                  <button
-                    type="button"
-                    onClick={handleAddTrial}
-                    className="w-1/2 mt-2 border border-gray-300 rounded-full px-4 py-1 text-gray-400 flex items-center justify-between hover:bg-gray-50"
-                    aria-label="Add trial"
-                  >
-                    <span className="mx-auto">Add trial</span>
-                    <span className="ml-2 inline-flex items-center justify-center w-7 h-5 rounded-full border border-gray-300 text-gray-400">
-                      <Plus className="w-4 h-4" />
-                    </span>
-                  </button>
-                )}
-              </div>
-            </div>
-            )}
-          </div>
-
-          {/* Submit Button */}
-          <div className="flex justify-end pt-6 gap-4">
-         
-              
-         
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex items-center space-x-2 px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <span>Submit</span>
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* Success Modal */}
-      {showSuccessModal && submittedUser && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Add User</h2>
-              <button
-                onClick={() => setShowSuccessModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <X className="h-5 w-5 text-gray-600" />
-              </button>
-            </div>
-
-            {/* Success Content */}
-            <div className="p-6">
-              {/* Success Message */}
-              <div className="text-center mb-6">
-                <div className="flex items-center justify-center mb-3">
-                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900">User has been added</h3>
-              </div>
-
-              {/* Divider */}
-              <div className="border-t border-gray-200 mb-6"></div>
-
-              {/* User Details */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                {/* Left Column - User Info */}
-                <div>
-                  <div className="font-semibold text-gray-900 text-sm mb-1">
-                    {submittedUser.firstName} {submittedUser.lastName}
-                  </div>
-                  <div className="text-xs text-gray-600">
-                    {submittedUser.email}
-                  </div>
-                </div>
-
-                {/* Right Column - Role and Trials */}
-                <div>
-                  <div className="font-semibold text-gray-900 text-sm mb-1">
-                    {submittedUser.role}
-                  </div>
-                  <div className="text-xs text-gray-600 space-y-1">
-                    {submittedUser.clinicalTrial.split(', ').map((trial, index) => (
-                      <div key={index}>{trial}</div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Close Button */}
-              <div className="flex justify-end">
-                <button
-                  onClick={() => setShowSuccessModal(false)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  <span>Close</span>
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-
-
-addclinicaltrial
-'use client'
-
-import { useState, useEffect, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { X, Calendar, ChevronDown } from 'lucide-react'
-import DatePicker from 'react-datepicker'
-import 'react-datepicker/dist/react-datepicker.css'
-
-interface ClinicalTrial {
-  id: string
-  name: string
-  status: 'Active' | 'Inactive'
-  phase: string
-  participants: number
-  startDate: string
-  endDate: string
-  principalInvestigator: string
-  sites: number
-}
-
-// Mock data for existing clinical trials
-const existingClinicalTrials: ClinicalTrial[] = [
-  {
-    id: '1',
-    name: 'GSXK Diabetes Study',
-    status: 'Active',
-    phase: 'Phase III',
-    participants: 150,
-    startDate: '15/01/2024',
-    endDate: '15/12/2024',
-    principalInvestigator: 'Dr. Sarah Johnson',
-    sites: 12
-  },
-  {
-    id: '2',
-    name: 'GKR4 Oncology Trial',
-    status: 'Active',
-    phase: 'Phase II',
-    participants: 85,
-    startDate: '20/02/2024',
-    endDate: '20/11/2024',
-    principalInvestigator: 'Dr. Michael Chen',
-    sites: 8
-  },
-  {
-    id: '3',
-    name: 'GYDG Cardiovascular Study',
-    status: 'Inactive',
-    phase: 'Phase III',
-    participants: 200,
-    startDate: '10/03/2023',
-    endDate: '10/12/2023',
-    principalInvestigator: 'Dr. Emily Rodriguez',
-    sites: 15
-  }
-]
-
-export default function AddClinicalTrialPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const editId = searchParams.get('edit')
-  
-  const [isEditing, setIsEditing] = useState(false)
-  const [formData, setFormData] = useState({
-    trialCode: '',
-    diseaseState: '',
-    countryRegion: [] as string[],
-    language: [] as string[],
-    startDate: null as Date | null,
-    endDate: null as Date | null
-  })
-  const [showCountryDropdown, setShowCountryDropdown] = useState(false)
-  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false)
-  const [showSuccessModal, setShowSuccessModal] = useState(false)
-  const countryRef = useRef<HTMLDivElement>(null)
-  const languageRef = useRef<HTMLDivElement>(null)
-
-  // Load trial data when editing
-  useEffect(() => {
-    if (editId) {
-      const trial = existingClinicalTrials.find(t => t.id === editId)
-      if (trial) {
-        // Parse dates from DD/MM/YYYY format
-        const parseDate = (dateStr: string): Date | null => {
-          if (!dateStr) return null;
-          const parts = dateStr.split('/').map(Number);
-          if (parts.length === 3) {
-            const [day, month, year] = parts;
-            if (day && month && year) {
-              const d = new Date(year, month - 1, day);
-              if (!isNaN(d.getTime())) return d;
-            }
-          }
-          return null;
-        };
-
-        setFormData({
-          trialCode: trial.name,
-          diseaseState: trial.phase,
-          countryRegion: ['US'], // Default for now
-          language: ['English'], // Default for now
-          startDate: parseDate(trial.startDate),
-          endDate: parseDate(trial.endDate)
-        })
-        setIsEditing(true)
-      }
-    }
-  }, [editId])
-
-  const handleInputChange = (field: string, value: string | Date | null) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
-  }
-
-  const handleMultiSelect = (field: 'countryRegion' | 'language', value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: prev[field].includes(value)
-        ? prev[field].filter(item => item !== value)
-        : [...prev[field], value]
-    }))
-  }
-
-  const countryOptions = [
-    { value: 'US', label: 'United States (US)' },
-    { value: 'PR', label: 'Puerto Rico (PR)' },
-    { value: 'CA', label: 'Canada (CA)' },
-    { value: 'UK', label: 'United Kingdom (UK)' },
-    { value: 'DE', label: 'Germany (DE)' },
-    { value: 'FR', label: 'France (FR)' },
-    { value: 'AU', label: 'Australia (AU)' },
-    { value: 'JP', label: 'Japan (JP)' },
-    { value: 'IN', label: 'India (IN)' },
-    { value: 'BR', label: 'Brazil (BR)' },
-    { value: 'MX', label: 'Mexico (MX)' }
-  ]
-
-  const languageOptions = [
-    { value: 'EN', label: 'English (EN)' },
-    { value: 'ES', label: 'Español (ES)' },
-    { value: 'FR', label: 'Français (FR)' },
-    { value: 'DE', label: 'Deutsch (DE)' },
-    { value: 'IT', label: 'Italiano (IT)' },
-    { value: 'PT', label: 'Português (PT)' },
-    { value: 'JA', label: '日本語 (JA)' },
-    { value: 'KO', label: '한국어 (KO)' },
-    { value: 'ZH', label: '中文 (ZH)' },
-    { value: 'HI', label: 'हिन्दी (HI)' }
-  ]
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log('Form submitted:', formData)
-    
-    // Format date helper
-    const formatDate = (date: Date): string => {
-      const day = String(date.getDate()).padStart(2, '0')
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const year = String(date.getFullYear())
-      return `${day}/${month}/${year}`
-    }
-    
-    // Create new trial object
-    const newTrial = {
-      id: isEditing ? editId! : String(Date.now()),
-      name: formData.trialCode,
-      status: 'Active' as 'Active' | 'Inactive',
-      phase: formData.diseaseState,
-      participants: Math.floor(Math.random() * 200) + 20,
-      startDate: formData.startDate ? formatDate(formData.startDate) : '',
-      endDate: formData.endDate ? formatDate(formData.endDate) : '',
-      principalInvestigator: 'Dr. TBD',
-      sites: Math.floor(Math.random() * 10) + 3,
-      countryRegion: formData.countryRegion,
-      language: formData.language
-    }
-    
-    // Get existing trials
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('clinicalTrials')
-      let existingTrials = stored ? JSON.parse(stored) : existingClinicalTrials
-      
-      // Add or update
-      if (isEditing) {
-        existingTrials = existingTrials.map((t: ClinicalTrial) => 
-          t.id === editId ? newTrial : t
-        )
-      } else {
-        existingTrials.push(newTrial)
-      }
-      
-      localStorage.setItem('clinicalTrials', JSON.stringify(existingTrials))
-    }
-    
-    // Show success modal
-    setShowSuccessModal(true)
-  }
-
-  const handleClose = () => {
-    router.push('/clinical-trials')
-  }
-
-  const handleSuccessModalClose = () => {
-    setShowSuccessModal(false)
-    router.push('/clinical-trials')
-  }
-
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (countryRef.current && !countryRef.current.contains(event.target as Node)) {
-        setShowCountryDropdown(false)
-      }
-      if (languageRef.current && !languageRef.current.contains(event.target as Node)) {
-        setShowLanguageDropdown(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [])
-
-  return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 relative">
-        {/* Close Button */}
-        <button
-          onClick={handleClose}
-          className="absolute top-6 right-6 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
-        >
-          <X className="w-4 h-4 text-gray-600" />
-        </button>
-
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-xl font-bold text-gray-900">
-            {isEditing ? 'Edit Clinical Trial' : 'Add Clinical Trial'}
-          </h1>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Left Column */}
-            <div className="space-y-6">
-              {/* Trial Code */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Trial Code
-                </label>
-                <input
-                  type="text"
-                  value={formData.trialCode}
-                  onChange={(e) => handleInputChange('trialCode', e.target.value)}
-                  className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder=""
-                />
-              </div>
-
-              {/* Country/Region */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Country/Region
-                </label>
-                <div className="relative" ref={countryRef}>
-                  <button
-                    type="button"
-                    onClick={() => setShowCountryDropdown(!showCountryDropdown)}                    className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between"
-                  >
-                    <span className={formData.countryRegion.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
-                      {formData.countryRegion.length === 0 ? 'Select' : `${formData.countryRegion.length} selected`}
-                    </span>
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
-                  </button>
-                  
-                  {showCountryDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                      {countryOptions.map((option) => (
-                        <label
-                          key={option.value}
-                          className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.countryRegion.includes(option.value)}
-                            onChange={() => handleMultiSelect('countryRegion', option.value)}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                          <span className="ml-3 text-sm text-gray-700">{option.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Start Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Start date
-                </label>
-                <div className="relative">
-                  <DatePicker
-                    selected={formData.startDate}
-                    onChange={(date: Date | null) => handleInputChange('startDate', date)}
-                    placeholderText=""
-                    className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    dateFormat="dd/MM/yyyy"
-                  />
-                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column */}
-            <div className="space-y-6">
-              {/* Disease State */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Disease State
-                </label>
-                <input
-                  type="text"
-                  value={formData.diseaseState}
-                  onChange={(e) => handleInputChange('diseaseState', e.target.value)}
-                  className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder=""
-                />
-              </div>
-
-              {/* Language */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Language
-                </label>
-                <div className="relative" ref={languageRef}>
-                  <button
-                    type="button"
-                    onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-                    className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between"
-                  >
-                    <span className={formData.language.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
-                      {formData.language.length === 0 ? 'Select' : `${formData.language.length} selected`}
-                    </span>
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
-                  </button>
-                  
-                  {showLanguageDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                      {languageOptions.map((option) => (
-                        <label
-                          key={option.value}
-                          className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.language.includes(option.value)}
-                            onChange={() => handleMultiSelect('language', option.value)}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                          <span className="ml-3 text-sm text-gray-700">{option.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* End Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  End date
-                </label>
-                <div className="relative">
-                  <DatePicker
-                    selected={formData.endDate}
-                    onChange={(date: Date | null) => handleInputChange('endDate', date)}
-                    placeholderText=""
-                    className="w-full h-10 px-4 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    dateFormat="dd/MM/yyyy"
-                  />
-                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <div className="flex justify-end pt-6">
-            <button
-              type="submit"
-              className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg font-medium flex items-center space-x-2 transition-colors"
-            >
-              <span>Submit</span>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* Success Modal */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative">
-            {/* Close Button */}
-            <button
-              onClick={handleSuccessModalClose}
-              className="absolute top-4 right-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
-            >
-              <X className="w-4 h-4 text-gray-600" />
-            </button>
-
-            {/* Header */}
-            <div className="mb-4">
-              <h2 className="text-xl font-bold text-gray-900">{isEditing ? 'Edit Clinical Trial' : 'Add Clinical Trial'}</h2>
-            </div>
-
-            <hr className="border-gray-200 mb-4" />
-
-            {/* Success Message */}
-            <div className="flex items-center justify-center mb-6">
-              <div className="bg-green-100 rounded-full p-2 mr-3">
-                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <p className="text-lg font-bold text-gray-900">{isEditing ? 'Clinical Trial has been edited' : 'Clinical Trial has been added'}</p>
-            </div>
-
-            <hr className="border-gray-200 mb-6" />
-
-            {/* Trial Details */}
-            <div className="grid grid-cols-2 gap-y-2 text-sm mb-6">
-              <div>
-                <p className="font-bold text-gray-900">{formData.trialCode || 'GSXL Diabetes'}</p>
-                <p className="text-gray-700">
-                  {formData.countryRegion.length > 0
-                    ? countryOptions.filter(opt => formData.countryRegion.includes(opt.value)).map(opt => opt.label.split(' ')[0]).join(', ')
-                    : 'United States'}
-                </p>
-                <p className="text-gray-700">
-                  {formData.language.length > 0
-                    ? languageOptions.filter(opt => formData.language.includes(opt.value)).map(opt => opt.label.split(' ')[0]).join(', ')
-                    : 'English, Español'}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="font-bold text-gray-900">
-                  Start Date: {formData.startDate ? formData.startDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '10/20/24'}
-                </p>
-                <p className="font-bold text-gray-900">
-                  End Date: {formData.endDate ? formData.endDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '9/30/26'}
-                </p>
-              </div>
-            </div>
-
-            {/* Close Button */}
-            <div className="flex justify-end">
-              <button
-                onClick={handleSuccessModalClose}
-                className="bg-red-600 text-white px-6 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 hover:bg-red-700 transition-colors"
-              >
-                <span>Close</span>
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-addsite
-'use client'
-
-import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { X, Search, Plus, Trash2, Save } from 'lucide-react'
-
-interface SiteCoordinator {
-  id: string
-  firstName: string
-  lastName: string
-  email: string
-  role: string
-  clinicalTrial: string
-  status: 'Active' | 'Inactive'
-  startDate: string
-  endDate: string
-}
-
-interface FormErrors {
-  [key: string]: string
-}
-
-// Mock data for existing site coordinators (matching site-coordinators page data)
-const existingSiteCoordinators: SiteCoordinator[] = [
-  {
-    id: '1',
-    firstName: 'Audra',
-    lastName: 'Luettgen',
-    email: 'Audra.Luettgen@domain.ext',
-    role: 'Site Coord.',
-    clinicalTrial: 'Clinical Trial 1',
-    status: 'Active',
-    startDate: '15/01/2024',
-    endDate: '15/12/2024'
-  },
-  {
-    id: '2',
-    firstName: 'Augustus',
-    lastName: 'Daugherty',
-    email: 'Augustus.Daugherty@domain.ext',
-    role: 'Site Coord.',
-    clinicalTrial: 'Clinical Trial 1',
-    status: 'Active',
-    startDate: '20/02/2024',
-    endDate: '20/11/2024'
-  },
-  {
-    id: '3',
-    firstName: 'Dessie',
-    lastName: 'Grady',
-    email: 'Dessie.Grady@domain.ext',
-    role: 'Site Coord.',
-    clinicalTrial: 'Clinical Trial 1',
-    status: 'Active',
-    startDate: '10/03/2024',
-    endDate: '10/10/2024'
-  },
-  {
-    id: '4',
-    firstName: 'Selina',
-    lastName: 'Abernathy',
-    email: 'Selina.Abernathy@domain.ext',
-    role: 'Site Coord.',
-    clinicalTrial: 'Clinical Trial 1',
-    status: 'Active',
-    startDate: '05/04/2024',
-    endDate: '05/09/2024'
-  },
-  {
-    id: '5',
-    firstName: 'Lyda',
-    lastName: 'Gulgowski',
-    email: 'Lyda.Gulgowski@domain.ext',
-    role: 'Site Coord.',
-    clinicalTrial: 'Clinical Trial 1',
-    status: 'Active',
-    startDate: '12/05/2024',
-    endDate: '12/08/2024'
-  },
-  {
-    id: '6',
-    firstName: 'Lola',
-    lastName: 'Rutherford',
-    email: 'Lola.Rutherford@domain.ext',
-    role: 'Site Coord.',
-    clinicalTrial: 'Clinical Trial 1',
-    status: 'Inactive',
-    startDate: '01/06/2024',
-    endDate: '01/07/2024'
-  }
-]
-
-const availableRoles = [
-  'Site Coord.',
-  'Study Coord.',
-  'Admin',
-  'User'
-]
-
-const availableTrials = [
-  'Clinical Trial 1',
-  'Clinical Trial 2',
-  'Clinical Trial 3'
-]
-
-export default function AddSiteCoordinatorPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const editId = searchParams.get('edit')
-  
-  const [isEditing, setIsEditing] = useState(false)
-  const [siteCoordinator, setSiteCoordinator] = useState<SiteCoordinator>({
-    id: '',
-    firstName: '',
-    lastName: '',
-    email: '',
-    role: '',
-    clinicalTrial: '',
-    status: 'Active',
-    startDate: '',
-    endDate: ''
-  })
-  
-  const [formErrors, setFormErrors] = useState<FormErrors>({})
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showSuccessModal, setShowSuccessModal] = useState(false)
-  const [addedCoordinator, setAddedCoordinator] = useState<SiteCoordinator | null>(null)
-  const [submittedTrials, setSubmittedTrials] = useState<string[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<SiteCoordinator[]>([])
-  const [showSearchResults, setShowSearchResults] = useState(false)
-  const [selectedTrials, setSelectedTrials] = useState<string[]>([''])
-
-  useEffect(() => {
-    if (editId) {
-      const coordinator = existingSiteCoordinators.find(c => c.id === editId)
-      if (coordinator) {
-        setSiteCoordinator(coordinator)
-        setIsEditing(true)
-        // Seed trials list when coming directly via edit link
-        setSelectedTrials([coordinator.clinicalTrial || ''])
-      }
-    }
-  }, [editId])
-
-  const validateForm = () => {
-    const errors: FormErrors = {}
-    
-    if (!siteCoordinator.firstName.trim()) {
-      errors.firstName = 'First name is required'
-    }
-    
-    if (!siteCoordinator.lastName.trim()) {
-      errors.lastName = 'Last name is required'
-    }
-    
-    if (!siteCoordinator.email.trim()) {
-      errors.email = 'Email is required'
-    } else if (!/\S+@\S+\.\S+/.test(siteCoordinator.email)) {
-      errors.email = 'Email is invalid'
-    }
-    if (!siteCoordinator.clinicalTrial) {
-      errors.clinicalTrial = 'Clinical trial is required'
-    }
-    
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    console.log('=== SITE COORDINATOR FORM SUBMISSION ===')
-    console.log('Form data:', siteCoordinator)
-    console.log('Is editing:', isEditing)
-    // Ensure clinical trial is synced from the first selected trial if present
-    const firstSelectedTrial = (selectedTrials || []).find(t => t && t.trim().length > 0) || ''
-    if (!siteCoordinator.clinicalTrial && firstSelectedTrial) {
-      setSiteCoordinator(prev => ({ ...prev, clinicalTrial: firstSelectedTrial }))
-    }
-    
-    if (!validateForm()) {
-      console.log('Form validation failed:', formErrors)
-      return
-    }
-
-    setIsSubmitting(true)
-    
+  const checkAuthStatus = async (): Promise<void> => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      console.log('Successfully saved site coordinator:', siteCoordinator)
-      
-      // Store the added coordinator and trials for success modal
-      setAddedCoordinator(siteCoordinator)
-      setSubmittedTrials(selectedTrials.filter(t => t && t.trim().length > 0))
-      setShowSuccessModal(true)
-      
-      // Reset form if adding new
-      if (!isEditing) {
-        setSiteCoordinator({
-          id: '',
-          firstName: '',
-          lastName: '',
-          email: '',
-          role: '',
-          clinicalTrial: '',
-          status: 'Active',
-          startDate: '',
-          endDate: ''
-        })
+      const response = await fetch('/api/auth/me')
+      if (response.ok) {
+        const userData = await response.json()
+        setUser(userData.user)
       }
     } catch (error) {
-      console.error('Error saving site coordinator:', error)
-      alert('Failed to save site coordinator. Please try again.')
+      console.error('Auth check failed:', error)
     } finally {
-      setIsSubmitting(false)
+      setLoading(false)
     }
   }
 
-  const handleSearchChange = (value: string) => {
-    setSearchQuery(value)
-    
-    if (value.trim().length > 0) {
-      const filtered = existingSiteCoordinators.filter(coordinator => 
-        coordinator.firstName.toLowerCase().includes(value.toLowerCase()) ||
-        coordinator.lastName.toLowerCase().includes(value.toLowerCase()) ||
-        coordinator.email.toLowerCase().includes(value.toLowerCase()) ||
-        coordinator.role.toLowerCase().includes(value.toLowerCase())
-      )
-      setSearchResults(filtered)
-      setShowSearchResults(true)
-    } else {
-      setSearchResults([])
-      setShowSearchResults(false)
+  const sendOTP = async (phoneNumber: string): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phoneNumber }),
+      })
+
+      return response.ok
+    } catch (error) {
+      console.error('Send OTP failed:', error)
+      return false
     }
   }
 
-  const handleCoordinatorSelect = (coordinator: SiteCoordinator) => {
-    setSiteCoordinator(coordinator)
-    setIsEditing(true)
-    setSearchQuery('')
-    setSearchResults([])
-    setShowSearchResults(false)
-    setSelectedTrials([coordinator.clinicalTrial || ''])
-  }
+  const login = async (phoneNumber: string, otp: string): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phoneNumber, otp }),
+      })
 
-  const handleInputChange = (field: keyof SiteCoordinator, value: string) => {
-    setSiteCoordinator(prev => ({ ...prev, [field]: value }))
-    if (formErrors[field]) {
-      setFormErrors(prev => ({ ...prev, [field]: '' }))
-    }
-  }
-
-  const closeSuccessModal = () => {
-    setShowSuccessModal(false)
-    setAddedCoordinator(null)
-  }
-
-  // Trials helpers (match Add User behaviour)
-  const handleTrialChange = (index: number, value: string) => {
-    const trials = [...selectedTrials]
-    trials[index] = value
-    setSelectedTrials(trials)
-    if (index === 0) {
-      setSiteCoordinator(prev => ({ ...prev, clinicalTrial: value }))
-    }
-  }
-
-  const handleAddTrial = () => {
-    if (selectedTrials.length < 5) {
-      setSelectedTrials(prev => [...prev, ''])
-    }
-  }
-
-  const handleRemoveTrial = (index: number) => {
-    if (selectedTrials.length > 1) {
-      const trials = selectedTrials.filter((_, i) => i !== index)
-      setSelectedTrials(trials)
-      if (index === 0) {
-        setSiteCoordinator(prev => ({ ...prev, clinicalTrial: trials[0] || '' }))
+      if (response.ok) {
+        const data = await response.json()
+        setUser(data.user)
+        return true
       }
+      return false
+    } catch (error) {
+      console.error('Login failed:', error)
+      return false
     }
   }
 
-  return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">
-              {isEditing ? 'Edit Site Coordinator' : 'Add Site Coordinator'}
-            </h1>
-            <p className="text-sm text-gray-600 mt-1">
-              {isEditing ? 'Update site coordinator information' : ''}
-            </p>
-          </div>
-          <button
-            onClick={() => router.push('/site-coordinators')}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <X className="h-6 w-6 text-gray-600" />
-          </button>
-        </div>
+  const logout = async (): Promise<void> => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+      })
+    } catch (error) {
+      console.error('Logout failed:', error)
+    } finally {
+      setUser(null)
+    }
+  }
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="px-4 pt-2 pb-4 space-y-4">
-          {/* Search Section (hidden in edit mode) */}
-          {!isEditing && (
-          <div className="space-y-4">
-            <div className="relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder="Search name"
-                className="w-full px-4 py-1 bg-gray-50 border border-gray-200 rounded-3xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            </div>
-            
-            {showSearchResults && searchResults.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                {searchResults.map((coordinator) => (
-                  <div
-                    key={coordinator.id}
-                    onClick={() => handleCoordinatorSelect(coordinator)}
-                    className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium text-sm text-gray-900">
-                          {coordinator.firstName} {coordinator.lastName}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {coordinator.email} • {coordinator.role}
-                        </div>
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          coordinator.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {coordinator.status}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            {/* Divider */}
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-3 bg-white text-gray-500">or</span>
-              </div>
-            </div>
-          </div>
-          )}
+  const updateProfile = async (data: ProfileUpdateData): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/auth/profile', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
 
-          {/* Form Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* First Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                First Name
-              </label>
-              <input
-                type="text"
-                value={siteCoordinator.firstName}
-                onChange={(e) => handleInputChange('firstName', e.target.value)}
-                className={`w-full px-3 py-2 bg-gray-50 border rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  formErrors.firstName ? 'border-red-500' : 'border-gray-200'
-                }`}
-                placeholder="Enter first name"
-              />
-              {formErrors.firstName && (
-                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
-                  {formErrors.firstName || 'Enter first name'}
-                </div>
-              )}
-            </div>
+      if (response.ok) {
+        const updatedUser = await response.json()
+        setUser(updatedUser.user)
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('Profile update failed:', error)
+      return false
+    }
+  }
 
-            {/* Last Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Last Name 
-              </label>
-              <input
-                type="text"
-                value={siteCoordinator.lastName}
-                onChange={(e) => handleInputChange('lastName', e.target.value)}
-                className={`w-full px-3 py-2 bg-gray-50 border rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  formErrors.lastName ? 'border-red-500' : 'border-gray-200'
-                }`}
-                placeholder="Enter last name"
-              />
-              {formErrors.lastName && (
-                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
-                  {formErrors.lastName || 'Enter last name'}
-                </div>
-              )}
-            </div>
+  const value: AuthContextType = {
+    user,
+    loading,
+    login,
+    logout,
+    sendOTP,
+    updateProfile,
+  }
 
-            {/* Email */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email 
-              </label>
-              <input
-                type="email"
-                value={siteCoordinator.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                className={`w-full px-3 py-2 bg-gray-50 border rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  formErrors.email ? 'border-red-500' : 'border-gray-200'
-                }`}
-                placeholder="Enter email address"
-              />
-              {formErrors.email && (
-                <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
-                  {formErrors.email || 'Enter email'}
-                </div>
-              )}
-            </div>
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
 
-
-            {/* Clinical Trials (multi) */}
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-gray-900 mb-1">
-                Clinical Trials
-              </label>
-              <div className="space-y-2">
-                {selectedTrials.map((trial, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <div className="w-1/2">
-                      <select
-                        value={trial}
-                        onChange={(e) => handleTrialChange(index, e.target.value)}
-                        className={`w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
-                          formErrors.clinicalTrial ? 'border-red-500' : ''
-                        }`}
-                      >
-                        <option value="">Select trial</option>
-                        {availableTrials.map((availableTrial) => (
-                          <option key={availableTrial} value={availableTrial}>
-                            {availableTrial}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {selectedTrials.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTrial(index)}
-                        className="text-gray-400 hover:text-red-500 p-1"
-                      >
-                        🗑
-                      </button>
-                    )}
-                  </div>
-                ))}
-                {/* Error above Add trial */}
-                {formErrors.clinicalTrial && (
-                  <div className="mt-2 w-1/2 rounded-lg border border-red-300 bg-white shadow-sm">
-                    <div className="flex items-center gap-3 px-4 py-3 text-gray-800">
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-600 text-sm font-semibold">!</span>
-                      <span className="text-sm">Select a clinical trial</span>
-                    </div>
-                  </div>
-                )}
-
-                {selectedTrials.length < 5 && (
-                  <button
-                    type="button"
-                    onClick={handleAddTrial}
-                    className="w-1/2 mt-2 border border-gray-300 rounded-full px-4 py-1 text-gray-400 flex items-center justify-between hover:bg-gray-50"
-                    aria-label="Add trial"
-                  >
-                    <span className="mx-auto">Add trial</span>
-                    <span className="ml-2 inline-flex items-center justify-center w-7 h-5 rounded-full border border-gray-300 text-gray-400">
-                      <Plus className="w-4 h-4" />
-                    </span>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <div className="flex justify-end pt-6 gap-4">
-         
-              
-         
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex items-center space-x-2 px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <span>Submit</span>
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-        </form>
-      </div>
-      {/* Success Modal */}
-      {showSuccessModal && addedCoordinator && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4">
-              <h2 className="text-lg font-semibold text-gray-900">{isEditing ? 'Edit Site Coordinator' : 'Add Site Coordinator'}</h2>
-              <button
-                onClick={() => setShowSuccessModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <X className="h-5 w-5 text-gray-600" />
-              </button>
-            </div>
-
-            {/* Success Content */}
-            <div className="p-6">
-              {/* Success Message */}
-              <div className="text-center mb-6">
-                <div className="flex items-center justify-center mb-3">
-                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900">{isEditing ? 'Site Coordinator has been edited' : 'Site Coordinator has been added'}</h3>
-              </div>
-
-              {/* Divider */}
-              <div className="border-t border-gray-200 mb-6"></div>
-
-              {/* Coordinator Details */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                {/* Left Column - Coordinator Info */}
-                <div>
-                  <div className="font-semibold text-gray-900 text-sm mb-1">
-                    {addedCoordinator.firstName} {addedCoordinator.lastName}
-                  </div>
-                  <div className="text-xs text-gray-600">
-                    {addedCoordinator.email}
-                  </div>
-                </div>
-
-                {/* Right Column - Role and Trials (role optional) */}
-                <div>
-                  <div className="font-semibold text-gray-900 text-sm mb-1">Site Coordinator</div>
-                  <div className="text-xs text-gray-600 space-y-1">
-                    {(submittedTrials.length > 0 ? submittedTrials : [addedCoordinator.clinicalTrial])
-                      .filter(Boolean)
-                      .map((trial, index) => (
-                        <div key={index}>{trial}</div>
-                      ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Close Button */}
-              <div className="flex justify-end">
-                <button
-                  onClick={() => setShowSuccessModal(false)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  <span>Close</span>
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
+export function useAuth(): AuthContextType {
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider')
+  }
+  return context
 }
