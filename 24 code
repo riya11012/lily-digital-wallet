@@ -1,201 +1,46 @@
-layout.tsx
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import './globals.css';
-import Header from './components/Header';
-import AuthProviderWrapper from '../components/AuthProviderWrapper';
+import { NextRequest, NextResponse } from 'next/server'
+import { AuthService } from '@/lib/auth'
+import { cookies } from 'next/headers'
 
-const inter = Inter({ subsets: ['latin'] });
+export async function GET(request: NextRequest) {
+  try {
+    const cookieStore = await cookies()
+    const token = cookieStore.get('auth_token')?.value
 
-export const metadata: Metadata = {
-  title: 'Lilly Digital Wallet',
-  description: 'Send vouchers and copay cards to mobile numbers',
-};
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-
-  // ✅ Footer component
-  const Footer: React.FC = () => {
-    return (
-      <footer className="fixed bottom-0 left-0 w-full bg-[#D31610] py-4 px-8 flex items-center justify-between text-sm md:text-lg text-white shadow">
-        <img src="/default.jpeg" alt="Logo" className="h-10 w-auto" />
-        <div className="flex flex-wrap gap-6">
-          <a href="#" className="hover:underline">
-            Contact Us
-          </a>
-          <a href="#" className="hover:underline">
-            Terms of Use
-          </a>
-          <a href="#" className="hover:underline">
-            Privacy Statement
-          </a>
-        </div>
-      
-      </footer>
-    );
-  };
-
-  return (
-    <html lang="en">
-      <body className={`${inter.className} bg-gray-100 text-black`}>
-        {/* Header */}
-        <Header />
-
-        {/* Main scrollable content */}
-        <main className="mt-[80px] bg-white mb-[100px] px-6 overflow-y-auto">
-          <AuthProviderWrapper>
-            {children}
-          </AuthProviderWrapper>
-        </main>
-
-        {/* Footer */}
-        <Footer />
-      </body>
-    </html>
-  );
-}
-
-
-Authp.tsx
-'use client'
-
-import { AuthProvider } from '@/contexts/AuthContext'
-
-export default function AuthProviderWrapper({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return <AuthProvider>{children}</AuthProvider>
-}
-
-auth context
-'use client'
-
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { User, AuthContextType, ProfileUpdateData } from '@/types/auth'
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
-
-interface AuthProviderProps {
-  children: ReactNode
-}
-
-export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState<boolean>(true)
-
-  useEffect(() => {
-    checkAuthStatus()
-  }, [])
-
-  const checkAuthStatus = async (): Promise<void> => {
-    try {
-      const response = await fetch('/api/auth/me')
-      if (response.ok) {
-        const userData = await response.json()
-        setUser(userData.user)
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-    } finally {
-      setLoading(false)
+    if (!token) {
+      return NextResponse.json(
+        { error: 'No authentication token' },
+        { status: 401 }
+      )
     }
-  }
 
-  const sendOTP = async (phoneNumber: string): Promise<boolean> => {
-    try {
-      const response = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ phoneNumber }),
-      })
-
-      return response.ok
-    } catch (error) {
-      console.error('Send OTP failed:', error)
-      return false
+    // Validate session
+    const session = await AuthService.validateSession(token)
+    
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Invalid or expired session' },
+        { status: 401 }
+      )
     }
+
+    return NextResponse.json({
+      user: {
+        id: session.user.id,
+        phoneNumber: session.user.phoneNumber,
+        isVerified: session.user.isVerified,
+        firstName: session.user.firstName,
+        lastName: session.user.lastName,
+        email: session.user.email,
+        createdAt: session.user.createdAt,
+        updatedAt: session.user.updatedAt,
+      },
+    })
+  } catch (error) {
+    console.error('Get user error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
-
-  const login = async (phoneNumber: string, otp: string): Promise<boolean> => {
-    try {
-      const response = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ phoneNumber, otp }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setUser(data.user)
-        return true
-      }
-      return false
-    } catch (error) {
-      console.error('Login failed:', error)
-      return false
-    }
-  }
-
-  const logout = async (): Promise<void> => {
-    try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-      })
-    } catch (error) {
-      console.error('Logout failed:', error)
-    } finally {
-      setUser(null)
-    }
-  }
-
-  const updateProfile = async (data: ProfileUpdateData): Promise<boolean> => {
-    try {
-      const response = await fetch('/api/auth/profile', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      })
-
-      if (response.ok) {
-        const updatedUser = await response.json()
-        setUser(updatedUser.user)
-        return true
-      }
-      return false
-    } catch (error) {
-      console.error('Profile update failed:', error)
-      return false
-    }
-  }
-
-  const value: AuthContextType = {
-    user,
-    loading,
-    login,
-    logout,
-    sendOTP,
-    updateProfile,
-  }
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-export function useAuth(): AuthContextType {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
-  return context
 }
