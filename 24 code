@@ -1,550 +1,595 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { X, Calendar, ChevronDown } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Search, Plus, ChevronDown, MoreVertical, X, Calendar, ArrowRight } from 'lucide-react'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 
-interface ClinicalTrial {
+interface UserData {
   id: string
-  name: string
+  firstName: string
+  lastName: string
+  email: string
   status: 'Active' | 'Inactive'
-  phase: string
-  participants: number
+  role: string
   startDate: string
-  endDate: string
-  principalInvestigator: string
-  sites: number
+  endDate?: string
+  trial: string
 }
 
-// Mock data for existing clinical trials
-const existingClinicalTrials: ClinicalTrial[] = [
-  {
-    id: '1',
-    name: 'GSXK Diabetes Study',
-    status: 'Active',
-    phase: 'Phase III',
-    participants: 150,
-    startDate: '15/01/2024',
-    endDate: '15/12/2024',
-    principalInvestigator: 'Dr. Sarah Johnson',
-    sites: 12
-  },
-  {
-    id: '2',
-    name: 'GKR4 Oncology Trial',
-    status: 'Active',
-    phase: 'Phase II',
-    participants: 85,
-    startDate: '20/02/2024',
-    endDate: '20/11/2024',
-    principalInvestigator: 'Dr. Michael Chen',
-    sites: 8
-  },
-  {
-    id: '3',
-    name: 'GYDG Cardiovascular Study',
-    status: 'Inactive',
-    phase: 'Phase III',
-    participants: 200,
-    startDate: '10/03/2023',
-    endDate: '10/12/2023',
-    principalInvestigator: 'Dr. Emily Rodriguez',
-    sites: 15
-  }
-]
-
-type FormErrors = Record<string, string>
-
-export default function AddClinicalTrialPage() {
+export default function DashboardPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const editId = searchParams.get('edit')
   
-  const [isEditing, setIsEditing] = useState(false)
-  const [formData, setFormData] = useState({
-    trialCode: '',
-    diseaseState: '',
-    countryRegion: [] as string[],
-    language: [] as string[],
-    startDate: null as Date | null,
-    endDate: null as Date | null
+  const sampleUsers: UserData[] = [
+    { id: '1', firstName: 'Audra', lastName: 'Luettgen', email: 'Audra.Luettgen@domain.ext', status: 'Active', role: 'Study Coord.', startDate: '15/01/2024', endDate: '15/12/2024', trial: 'Clinical Trial 1' },
+    { id: '2', firstName: 'Augustus', lastName: 'Daugherty', email: 'Augustus.Daugherty@domain.ext', status: 'Active', role: 'Site Coord.', startDate: '20/02/2024', endDate: '20/11/2024', trial: 'Clinical Trial 1' },
+    { id: '3', firstName: 'Dessie', lastName: 'Grady', email: 'Dessie.Grady@domain.ext', status: 'Active', role: 'Site Coord.', startDate: '10/03/2024', endDate: '10/10/2024', trial: 'Clinical Trial 1' },
+    { id: '4', firstName: 'Selina', lastName: 'Abernathy', email: 'Selina.Abernathy@domain.ext', status: 'Active', role: 'Site Coord.', startDate: '05/04/2024', endDate: '05/09/2024', trial: 'Clinical Trial 2' },
+    { id: '5', firstName: 'Lyda', lastName: 'Gulgowski', email: 'Lyda.Gulgowski@domain.ext', status: 'Active', role: 'Site Coord.', startDate: '12/05/2024', endDate: '12/08/2024', trial: 'Clinical Trial 2' },
+    { id: '6', firstName: 'Lola', lastName: 'Rutherford', email: 'Lola.Rutherford@domain.ext', status: 'Inactive', role: 'Site Coord.', startDate: '01/06/2024', endDate: '01/07/2024', trial: 'Clinical Trial 2' }
+  ]
+
+  const [search, setSearch] = useState('')
+  const [trialFilter, setTrialFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [fromDate, setFromDate] = useState<Date | null>(null)
+  const [toDate, setToDate] = useState<Date | null>(null)
+  const [tempFromDate, setTempFromDate] = useState<Date | null>(null)
+  const [tempToDate, setTempToDate] = useState<Date | null>(null)
+  const [expandedTrials, setExpandedTrials] = useState<Record<string, boolean>>({ 'Clinical Trial 1': true })
+  const [showDropdown, setShowDropdown] = useState<string | null>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false)
+  const [userToDelete, setUserToDelete] = useState<UserData | null>(null)
+  const [showRemoveModal, setShowRemoveModal] = useState<boolean>(false)
+  const [userToRemove, setUserToRemove] = useState<UserData | null>(null)
+  const [showRemoveSuccessModal, setShowRemoveSuccessModal] = useState<boolean>(false)
+  const [removedUser, setRemovedUser] = useState<UserData | null>(null)
+  const [users, setUsers] = useState<UserData[]>(sampleUsers)
+  const fromDateRef = useRef<any>(null)
+  const toDateRef = useRef<any>(null)
+
+  const trials = [
+    { name: 'Clinical Trial 1', count: 50 },
+    { name: 'Clinical Trial 2', count: 20 }
+  ]
+
+  const filteredUsers = users.filter(user => {
+    if (search && !user.firstName.toLowerCase().includes(search.toLowerCase()) &&
+        !user.lastName.toLowerCase().includes(search.toLowerCase()) &&
+        !user.email.toLowerCase().includes(search.toLowerCase()) &&
+        !user.status.toLowerCase().includes(search.toLowerCase()) &&
+        !user.role.toLowerCase().includes(search.toLowerCase())) {
+      return false
+    }
+
+    if (trialFilter && user.trial !== trialFilter) {
+      return false
+    }
+
+    if (statusFilter && user.status.toLowerCase() !== statusFilter.toLowerCase()) {
+      return false
+    }
+
+    if (fromDate || toDate) {
+      const userStartDate = parseDate(user.startDate)
+      if (!userStartDate) return false
+      if (fromDate && userStartDate < fromDate) return false
+      if (toDate && userStartDate > toDate) return false
+    }
+
+    return true
   })
-  const [formErrors, setFormErrors] = useState<FormErrors>({})
-  const [showCountryDropdown, setShowCountryDropdown] = useState(false)
-  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false)
-  const [showSuccessModal, setShowSuccessModal] = useState(false)
-  const countryRef = useRef<HTMLDivElement>(null)
-  const languageRef = useRef<HTMLDivElement>(null)
 
-  // Load trial data when editing
-  useEffect(() => {
-    if (editId) {
-      const trial = existingClinicalTrials.find(t => t.id === editId)
-      if (trial) {
-        // Parse dates from DD/MM/YYYY format
-        const parseDate = (dateStr: string): Date | null => {
-          if (!dateStr) return null;
-          const parts = dateStr.split('/').map(Number);
-          if (parts.length === 3) {
-            const [day, month, year] = parts;
-            if (day && month && year) {
-              const d = new Date(year, month - 1, day);
-              if (!isNaN(d.getTime())) return d;
-            }
-          }
-          return null;
-        };
+  function parseDate(dateStr: string): Date | null {
+    if (!dateStr) return null
+    const [day, month, year] = dateStr.split('/').map(Number)
+    return new Date(year, month - 1, day)
+  }
 
-        setFormData({
-          trialCode: trial.name,
-          diseaseState: trial.phase,
-          countryRegion: ['US'], // Default for now
-          language: ['English'], // Default for now
-          startDate: parseDate(trial.startDate),
-          endDate: parseDate(trial.endDate)
-        })
-        setIsEditing(true)
-      }
-    }
-  }, [editId])
-
-  const handleInputChange = (field: string, value: string | Date | null) => {
-    setFormData(prev => ({
+  const toggleTrial = (trialName: string) => {
+    setExpandedTrials(prev => ({
       ...prev,
-      [field]: value
+      [trialName]: !prev[trialName]
     }))
-    if (formErrors[field]) {
-      setFormErrors(prev => ({ ...prev, [field]: '' }))
+  }
+
+  const getStatusDot = (status: string) => (
+    <div className={`w-2 h-2 rounded-full ${status === 'Active' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+  )
+
+  const handleUserAction = (user: UserData, event: React.MouseEvent) => {
+    event.stopPropagation()
+    setShowDropdown(showDropdown === user.id ? null : user.id)
+  }
+
+  const handleAddUser = () => {
+    console.log('Add User button clicked, navigating to /add-user')
+    router.push('/add-user')
+  }
+
+  const closeDropdown = () => setShowDropdown(null)
+
+  const handleDeleteUser = (user: UserData) => {
+    setUserToDelete(user)
+    setShowDeleteModal(true)
+    setShowDropdown(null)
+  }
+
+  const confirmDeleteUser = () => {
+    if (userToDelete) {
+      setUsers(users.filter(user => user.id !== userToDelete.id))
+      setShowDeleteModal(false)
+      setUserToDelete(null)
     }
   }
 
-  const handleMultiSelect = (field: 'countryRegion' | 'language', value: string) => {
-    setFormData(prev => {
-      const nextValues = prev[field].includes(value)
-        ? prev[field].filter(item => item !== value)
-        : [...prev[field], value]
-      return {
-        ...prev,
-        [field]: nextValues
-      }
-    })
-    if (formErrors[field]) {
-      setFormErrors(prev => ({ ...prev, [field]: '' }))
-    }
+  const cancelDeleteUser = () => {
+    setShowDeleteModal(false)
+    setUserToDelete(null)
   }
 
-  const countryOptions = [
-    { value: 'US', label: 'United States (US)' },
-    { value: 'PR', label: 'Puerto Rico (PR)' },
-    { value: 'CA', label: 'Canada (CA)' },
-    { value: 'UK', label: 'United Kingdom (UK)' },
-    { value: 'DE', label: 'Germany (DE)' },
-    { value: 'FR', label: 'France (FR)' },
-    { value: 'AU', label: 'Australia (AU)' },
-    { value: 'JP', label: 'Japan (JP)' },
-    { value: 'IN', label: 'India (IN)' },
-    { value: 'BR', label: 'Brazil (BR)' },
-    { value: 'MX', label: 'Mexico (MX)' }
-  ]
-
-  const languageOptions = [
-    { value: 'EN', label: 'English (EN)' },
-    { value: 'ES', label: 'Español (ES)' },
-    { value: 'FR', label: 'Français (FR)' },
-    { value: 'DE', label: 'Deutsch (DE)' },
-    { value: 'IT', label: 'Italiano (IT)' },
-    { value: 'PT', label: 'Português (PT)' },
-    { value: 'JA', label: '日本語 (JA)' },
-    { value: 'KO', label: '한국어 (KO)' },
-    { value: 'ZH', label: '中文 (ZH)' },
-    { value: 'HI', label: 'हिन्दी (HI)' }
-  ]
-
-  const validateForm = (): boolean => {
-    const errors: FormErrors = {}
-
-    if (!String(formData.trialCode).trim()) {
-      errors.trialCode = 'Enter trial code'
-    }
-    if (!String(formData.diseaseState).trim()) {
-      errors.diseaseState = 'Enter disease state'
-    }
-    if (!formData.countryRegion.length) {
-      errors.countryRegion = 'Select country/region'
-    }
-    if (!formData.language.length) {
-      errors.language = 'Select language'
-    }
-    if (!formData.startDate) {
-      errors.startDate = 'Select start date'
-    }
-    if (!formData.endDate) {
-      errors.endDate = 'Select end date'
-    }
-
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
+  const handleRemoveFromTrial = (user: UserData) => {
+    setUserToRemove(user)
+    setShowRemoveModal(true)
+    setShowDropdown(null)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    const isValid = validateForm()
-    if (!isValid) return
-    
-    // Format date helper
-    const formatDate = (date: Date): string => {
-      const day = String(date.getDate()).padStart(2, '0')
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const year = String(date.getFullYear())
-      return `${day}/${month}/${year}`
-    }
-    
-    // Create new trial object
-    const newTrial = {
-      id: isEditing ? editId! : String(Date.now()),
-      name: formData.trialCode,
-      status: 'Active' as 'Active' | 'Inactive',
-      phase: formData.diseaseState,
-      participants: Math.floor(Math.random() * 200) + 20,
-      startDate: formData.startDate ? formatDate(formData.startDate) : '',
-      endDate: formData.endDate ? formatDate(formData.endDate) : '',
-      principalInvestigator: 'Dr. TBD',
-      sites: Math.floor(Math.random() * 10) + 3,
-      countryRegion: formData.countryRegion,
-      language: formData.language
-    }
-    
-    // Get existing trials
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('clinicalTrials')
-      let existingTrials = stored ? JSON.parse(stored) : existingClinicalTrials
+  const confirmRemoveFromTrial = () => {
+    if (userToRemove) {
+      // Update user status to Inactive
+      const updatedUsers = users.map(user => 
+        user.id === userToRemove.id 
+          ? { ...user, status: 'Inactive' as 'Inactive' }
+          : user
+      )
+      setUsers(updatedUsers)
       
-      // Add or update
-      if (isEditing) {
-        existingTrials = existingTrials.map((t: ClinicalTrial) => 
-          t.id === editId ? newTrial : t
-        )
-      } else {
-        existingTrials.push(newTrial)
-      }
+      // Store the removed user data with updated status for success modal
+      const updatedUser = { ...userToRemove, status: 'Inactive' as 'Inactive' }
+      setRemovedUser(updatedUser)
       
-      localStorage.setItem('clinicalTrials', JSON.stringify(existingTrials))
+      // Close the confirmation modal
+      setShowRemoveModal(false)
+      setUserToRemove(null)
+      
+      // Show success modal
+      setShowRemoveSuccessModal(true)
     }
-    
-    // Show success modal
-    setShowSuccessModal(true)
   }
 
-  const handleClose = () => {
-    router.push('/clinical-trials')
+  const cancelRemoveFromTrial = () => {
+    setShowRemoveModal(false)
+    setUserToRemove(null)
   }
 
-  const handleSuccessModalClose = () => {
-    setShowSuccessModal(false)
-    router.push('/clinical-trials')
+  const closeRemoveSuccessModal = () => {
+    setShowRemoveSuccessModal(false)
+    setRemovedUser(null)
   }
 
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (countryRef.current && !countryRef.current.contains(event.target as Node)) {
-        setShowCountryDropdown(false)
-      }
-      if (languageRef.current && !languageRef.current.contains(event.target as Node)) {
-        setShowLanguageDropdown(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [])
+  const applyDateFilter = () => {
+    setFromDate(tempFromDate)
+    setToDate(tempToDate)
+  }
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 relative">
-        {/* Close Button */}
-        <button
-          onClick={handleClose}
-          className="absolute top-6 right-6 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
-        >
-          <X className="w-4 h-4 text-gray-600" />
-        </button>
-
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-xl font-bold text-gray-900">
-            {isEditing ? 'Edit Clinical Trial' : 'Add Clinical Trial'}
-          </h1>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Left Column */}
-            <div className="space-y-6">
-              {/* Trial Code */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Trial Code
-                </label>
+    <div className="min-h-screen bg-white py-4">
+      <div className="max-w-5xl mx-auto px-4 mt-8">
+        <div className="bg-white rounded-2xl shadow-sm">
+          {/* Header */}
+          <div className="px-5 py-3 border-b bg-gray-100 border-gray-200 flex justify-between items-center rounded-t-2xl">
+            <h1 className="text-lg text-gray-900">Users</h1>
+            <div className="flex items-center space-x-3">
+              <div className="relative">
                 <input
                   type="text"
-                  value={formData.trialCode}
-                  onChange={(e) => handleInputChange('trialCode', e.target.value)}
-                  className={`w-full h-10 px-4 bg-gray-100 border ${formErrors.trialCode ? 'border-red-500' : 'border-gray-300'} rounded-t-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                  placeholder=""
+                  placeholder="Search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-70 pl-8 pr-20 px-2 py-2 border border-gray-300 rounded-3xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                {formErrors.trialCode && (
-                  <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
-                    Enter trial code
-                  </div>
-                )}
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
               </div>
-
-              {/* Country/Region */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Country/Region
-                </label>
-                <div className="relative" ref={countryRef}>
-                  <button
-                    type="button"
-                    onClick={() => setShowCountryDropdown(!showCountryDropdown)}                    className={`w-full h-10 px-4 bg-gray-100 border ${formErrors.countryRegion ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between`}
-                  >
-                    <span className={formData.countryRegion.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
-                      {formData.countryRegion.length === 0 ? 'Select' : `${formData.countryRegion.length} selected`}
-                    </span>
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
-                  </button>
-                  
-                  {showCountryDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                      {countryOptions.map((option) => (
-                        <label
-                          key={option.value}
-                          className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.countryRegion.includes(option.value)}
-                            onChange={() => handleMultiSelect('countryRegion', option.value)}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                          <span className="ml-3 text-sm text-gray-700">{option.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {formErrors.countryRegion && (
-                  <div className="mt-2 w-full rounded-lg border border-red-300 bg-white shadow-sm">
-                    <div className="flex items-center gap-3 px-4 py-3 text-gray-800">
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-600 text-sm font-semibold">!</span>
-                      <span className="text-sm">Select country/region</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Start Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Start date
-                </label>
-                <div className="relative">
-                  <DatePicker
-                    selected={formData.startDate}
-                    onChange={(date: Date | null) => handleInputChange('startDate', date)}
-                    placeholderText=""
-                    className={`w-full h-10 px-4 bg-gray-100 border ${formErrors.startDate ? 'border-red-500' : 'border-gray-300'} rounded-t-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                    dateFormat="dd/MM/yyyy"
-                  />
-                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
-                {formErrors.startDate && (
-                  <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
-                    Select start date
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Right Column */}
-            <div className="space-y-6">
-              {/* Disease State */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Disease State
-                </label>
-                <input
-                  type="text"
-                  value={formData.diseaseState}
-                  onChange={(e) => handleInputChange('diseaseState', e.target.value)}
-                  className={`w-full h-10 px-4 bg-gray-100 border ${formErrors.diseaseState ? 'border-red-500' : 'border-gray-300'} rounded-t-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                  placeholder=""
-                />
-                {formErrors.diseaseState && (
-                  <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
-                    Enter disease state
-                  </div>
-                )}
-              </div>
-
-              {/* Language */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Language
-                </label>
-                <div className="relative" ref={languageRef}>
-                  <button
-                    type="button"
-                    onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-                    className={`w-full h-10 px-4 bg-gray-100 border ${formErrors.language ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between`}
-                  >
-                    <span className={formData.language.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
-                      {formData.language.length === 0 ? 'Select' : `${formData.language.length} selected`}
-                    </span>
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
-                  </button>
-                  
-                  {showLanguageDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                      {languageOptions.map((option) => (
-                        <label
-                          key={option.value}
-                          className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.language.includes(option.value)}
-                            onChange={() => handleMultiSelect('language', option.value)}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                          <span className="ml-3 text-sm text-gray-700">{option.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {formErrors.language && (
-                  <div className="mt-2 w-full rounded-lg border border-red-300 bg-white shadow-sm">
-                    <div className="flex items-center gap-3 px-4 py-3 text-gray-800">
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-600 text-sm font-semibold">!</span>
-                      <span className="text-sm">Select language</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* End Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  End date
-                </label>
-                <div className="relative">
-                  <DatePicker
-                    selected={formData.endDate}
-                    onChange={(date: Date | null) => handleInputChange('endDate', date)}
-                    placeholderText=""
-                    className={`w-full h-10 px-4 bg-gray-100 border ${formErrors.endDate ? 'border-red-500' : 'border-gray-300'} rounded-t-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                    dateFormat="dd/MM/yyyy"
-                  />
-                  <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
-                {formErrors.endDate && (
-                  <div className="-mt-px w-full bg-red-600 text-white text-sm rounded-b-lg px-3 py-2">
-                    Select end date
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={handleAddUser}
+                className="bg-[#007fb2] text-white px-3 py-2 rounded-3xl text-sm font-medium flex items-center space-x-1 hover:bg-blue-700"
+              >
+                <Plus className="h-3 w-3" />
+                <span>Add User</span>
+              </button>
             </div>
           </div>
 
-          {/* Submit Button */}
-          <div className="flex justify-end pt-6">
-            <button
-              type="submit"
-              className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg font-medium flex items-center space-x-2 transition-colors"
+          {/* Filters */}
+          <div className="px-4 py-3 border-b border-gray-200 flex flex-wrap gap-3 items-center text-sm">
+            <span className="font-medium text-gray-700">FILTER</span>
+            <select 
+              value={trialFilter} 
+              onChange={(e) => setTrialFilter(e.target.value)} 
+              className="px-2 py-1 h-9 border bg-gray-100 border-gray-300 rounded-md text-sm"
             >
-              <span>Submit</span>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+              <option value="">Trial Name</option>
+              <option value="Clinical Trial 1">Clinical Trial 1</option>
+              <option value="Clinical Trial 2">Clinical Trial 2</option>
+            </select>
+            <select 
+              value={statusFilter} 
+              onChange={(e) => setStatusFilter(e.target.value)} 
+              className="px-2 py-1 h-9 bg-gray-100 border border-gray-300 rounded-md text-sm"
+            >
+              <option value="">Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+
+            {/* Date Filter */}
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-700 text-sm">DATE</span>
+              <div className="flex items-center bg-white border border-gray-300 rounded-lg h-9">
+                {/* From Date */}
+                <div className="relative flex items-center px-2 hover:bg-gray-50 rounded-l-lg">
+                  <DatePicker
+                    ref={fromDateRef}
+                    selected={tempFromDate}
+                    onChange={(date) => setTempFromDate(date)}
+                    placeholderText="From"
+                    className="w-12 text-xs text-gray-500 placeholder-gray-500 bg-transparent cursor-pointer"
+                    dateFormat="dd/MM/yyyy"
+                    wrapperClassName="date-picker-wrapper"
+                    popperClassName="date-picker-high-z-index"
+                    popperPlacement="bottom-start"
+                  />
+                  <Calendar 
+                    className="h-3 w-3 text-gray-500 ml-1 cursor-pointer" 
+                    onClick={() => fromDateRef.current?.setFocus()}
+                  />
+                </div>
+                
+                {/* Divider */}
+                <div className="h-5 w-px bg-gray-300"></div>
+                
+                {/* To Date */}
+                <div className="relative flex items-center px-2 hover:bg-gray-50">
+                  <DatePicker
+                    ref={toDateRef}
+                    selected={tempToDate}
+                    onChange={(date) => setTempToDate(date)}
+                    placeholderText="To"
+                    className="w-12 text-xs text-gray-500 placeholder-gray-500 bg-transparent cursor-pointer"
+                    dateFormat="dd/MM/yyyy"
+                    wrapperClassName="date-picker-wrapper"
+                    popperClassName="date-picker-high-z-index"
+                    popperPlacement="bottom-start"
+                  />
+                  <Calendar 
+                    className="h-3 w-3 text-gray-500 ml-1 cursor-pointer" 
+                    onClick={() => toDateRef.current?.setFocus()}
+                  />
+                </div>
+                
+                {/* Apply Button - Integrated */}
+                <button 
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-2 h-full transition-colors flex items-center justify-center rounded-r-lg"
+                  onClick={applyDateFilter}
+                >
+                  <ArrowRight className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+
+            {(trialFilter || statusFilter || fromDate || toDate) && (
+              <button 
+                onClick={() => { 
+                  setTrialFilter(''); 
+                  setStatusFilter(''); 
+                  setFromDate(null); 
+                  setToDate(null); 
+                  setTempFromDate(null); 
+                  setTempToDate(null);
+                }} 
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
           </div>
-        </form>
+
+          {/* Trials Section */}
+          {trials.map(trial => {
+            const trialUsers = filteredUsers.filter(user => user.trial === trial.name)
+            return (
+              <div key={trial.name} className="border-b border-gray-200 last:border-b-0">
+                <div className="px-4 py-3 bg-gray-50 flex justify-between items-center">
+                  <button 
+                    onClick={() => toggleTrial(trial.name)} 
+                    className="flex items-center space-x-2"
+                  >
+                    <ChevronDown className={`h-4 w-4 transition-transform ${expandedTrials[trial.name] ? 'rotate-180' : ''}`} />
+                    <span className="font-medium text-gray-900 text-sm">{trial.name}</span>
+                  </button>
+                  <span className="text-xs text-gray-500">{trialUsers.length} Records</span>
+                </div>
+                {expandedTrials[trial.name] && (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          {['First name', 'Last name', 'Email', 'Status', 'Role', 'Start date', 'End date', 'Actions'].map(header => (
+                            <th key={header} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{header}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {trialUsers.map(user => (
+                          <tr key={user.id} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 text-sm">{user.firstName}</td>
+                          <td className="px-3 py-2 text-sm">{user.lastName}</td>
+                          <td className="px-3 py-2 text-sm">{user.email}</td>
+                          <td className="px-3 py-2 flex items-center space-x-1">
+                            {getStatusDot(user.status)}
+                            <span className="text-xs">{user.status}</span>
+                          </td>
+                          <td className="px-3 py-2 text-sm">{user.role}</td>
+                          <td className="px-3 py-2 text-sm">{user.startDate}</td>
+                          <td className="px-3 py-2 text-sm">{user.endDate || '-'}</td>
+                          <td className="px-3 py-2 relative">
+                            <button 
+                              onClick={(e) => handleUserAction(user, e)} 
+                              className="p-1 hover:bg-gray-100 rounded"
+                            >
+                              <MoreVertical className="h-3 w-3 text-gray-400" />
+                            </button>
+                            {showDropdown === user.id && (
+                                <div className="absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg z-10 border text-xs">
+                                  <a href="/edit-user" className="block px-3 py-1 text-gray-700 hover:bg-gray-100">Edit</a>
+                                  <button 
+                                    onClick={() => handleRemoveFromTrial(user)}
+                                    className="block w-full text-left px-3 py-1 text-gray-700 hover:bg-gray-100"
+                                  >
+                                    Remove from trial
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDeleteUser(user)}
+                                    className="block w-full text-left px-3 py-1 text-red-600 hover:bg-gray-100"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                            )}
+                          </td>
+                        </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+
+          {/* No Results */}
+          {filteredUsers.length === 0 && (
+            <div className="text-center py-8">
+              <div className="text-gray-500 text-sm">No users found matching your criteria</div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Success Modal */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative">
-            {/* Close Button */}
-            <button
-              onClick={handleSuccessModalClose}
-              className="absolute top-4 right-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
-            >
-              <X className="w-4 h-4 text-gray-600" />
-            </button>
-
-            {/* Header */}
-            <div className="mb-4">
-              <h2 className="text-xl font-bold text-gray-900">{isEditing ? 'Edit Clinical Trial' : 'Add Clinical Trial'}</h2>
-            </div>
-
-            <hr className="border-gray-200 mb-4" />
-
-            {/* Success Message */}
-            <div className="flex items-center justify-center mb-6">
-              <div className="bg-green-100 rounded-full p-2 mr-3">
-                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <p className="text-lg font-bold text-gray-900">{isEditing ? 'Clinical Trial has been edited' : 'Clinical Trial has been added'}</p>
-            </div>
-
-            <hr className="border-gray-200 mb-6" />
-
-            {/* Trial Details */}
-            <div className="grid grid-cols-2 gap-y-2 text-sm mb-6">
-              <div>
-                <p className="font-bold text-gray-900">{formData.trialCode || 'GSXL Diabetes'}</p>
-                <p className="text-gray-700">
-                  {formData.countryRegion.length > 0
-                    ? countryOptions.filter(opt => formData.countryRegion.includes(opt.value)).map(opt => opt.label.split(' ')[0]).join(', ')
-                    : 'United States'}
-                </p>
-                <p className="text-gray-700">
-                  {formData.language.length > 0
-                    ? languageOptions.filter(opt => formData.language.includes(opt.value)).map(opt => opt.label.split(' ')[0]).join(', ')
-                    : 'English, Español'}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="font-bold text-gray-900">
-                  Start Date: {formData.startDate ? formData.startDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '10/20/24'}
-                </p>
-                <p className="font-bold text-gray-900">
-                  End Date: {formData.endDate ? formData.endDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '9/30/26'}
-                </p>
-              </div>
-            </div>
-
-            {/* Close Button */}
-            <div className="flex justify-end">
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && userToDelete && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Delete User</h2>
               <button
-                onClick={handleSuccessModalClose}
-                className="bg-red-600 text-white px-6 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 hover:bg-red-700 transition-colors"
+                onClick={cancelDeleteUser}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
               >
-                <span>Close</span>
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5 text-gray-600" />
               </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              {/* Warning Section */}
+              <div className="flex items-start space-x-4 mb-6">
+                {/* Warning Icon */}
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-red-600 text-xl font-bold">!</span>
+                </div>
+                
+                {/* Warning Text */}
+                <div className="flex-1">
+                  <h3 className="text-md font-semibold text-gray-900 mb-1">
+                    Are you sure you want to delete this user?
+                  </h3>
+                  <p className="text-md font-semibold text-gray-900">
+                    This action can not be undone.
+                  </p>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-gray-200 mb-6"></div>
+
+              {/* User Details */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                {/* Left Column - User Info */}
+                <div>
+                  <div className="font-semibold text-gray-900 text-sm mb-1">
+                    {userToDelete.firstName} {userToDelete.lastName}
+                  </div>
+                  <div className="text-xs text-gray-600">
+                    {userToDelete.email}
+                  </div>
+                </div>
+
+                {/* Right Column - Role and Trials */}
+                <div>
+                  <div className="font-semibold text-gray-900 text-sm mb-1">
+                    {userToDelete.role}
+                  </div>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <div>Repudiandae assumenda</div>
+                    <div>Tenetur non et</div>
+                    <div>Eos qui reiciendis</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={cancelDeleteUser}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  <span>Cancel</span>
+                  <X className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={confirmDeleteUser}
+                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  <span>Delete User</span>
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove from Trial Confirmation Modal */}
+      {showRemoveModal && userToRemove && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Remove from Trial</h2>
+              <button
+                onClick={cancelRemoveFromTrial}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              {/* Info Icon */}
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Confirmation Message */}
+              <div className="text-center mb-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Remove from Clinical Trial?</h3>
+                <p className="text-sm text-gray-600">
+                  This will remove the user from the current clinical trial but keep them in the system.
+                </p>
+                <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm font-medium text-gray-900">
+                    {userToRemove.firstName} {userToRemove.lastName}
+                  </p>
+                  <p className="text-xs text-gray-600">{userToRemove.email}</p>
+                  <p className="text-xs text-gray-500 mt-1">Current Trial: Clinical Trial 1</p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex space-x-3">
+                <button
+                  onClick={cancelRemoveFromTrial}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmRemoveFromTrial}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Remove from Trial
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove from Trial Success Modal */}
+      {showRemoveSuccessModal && removedUser && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Remove from Trial</h2>
+              <button
+                onClick={closeRemoveSuccessModal}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
+
+            {/* Success Content */}
+            <div className="p-6">
+              {/* Success Message */}
+              <div className="text-center mb-6">
+                <div className="flex items-center justify-center mb-3">
+                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900">User removed from trial</h3>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-gray-200 mb-6"></div>
+
+              {/* User Details */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                {/* Left Column - User Info */}
+                <div>
+                  <div className="font-semibold text-gray-900 text-sm mb-1">
+                    {removedUser.firstName} {removedUser.lastName}
+                  </div>
+                  <div className="text-xs text-gray-600">
+                    {removedUser.email}
+                  </div>
+                </div>
+
+                {/* Right Column - Trial Info */}
+                <div>
+                  <div className="font-semibold text-gray-900 text-sm mb-1">
+                    Removed from
+                  </div>
+                  <div className="text-xs text-gray-600">
+                    Clinical Trial 1
+                  </div>
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div className="flex justify-end">
+                <button
+                  onClick={closeRemoveSuccessModal}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <span>Close</span>
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
