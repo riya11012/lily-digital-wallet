@@ -339,18 +339,18 @@ export default function ClinicalTrialsPage() {
                               <ArrowRight className="h-3 w-3" />
                             </button>
                           </div>
+
+                          {/* CLEAR FILTERS BUTTON */}
+                          {(search || statusFilter || phaseFilter || fromDate || toDate) && (
+                            <button
+                              onClick={clearFilters}
+                              className="text-gray-400 rounded-full hover:text-gray-600 bg-gray-100 p-2"
+                            >
+                              <X className="h-5 w-5" />
+                            </button>
+                          )}
                         </div>
                       </div>
-
-                      {/* CLEAR FILTERS BUTTON */}
-                      {(search || statusFilter || phaseFilter || fromDate || toDate) && (
-                        <button
-                          onClick={clearFilters}
-                          className="px-3 py-1 text-xs border rounded-full mt-2 sm:mt-0 self-start sm:self-center"
-                        >
-                          ✕
-                        </button>
-                      )}
                     </div>
                   </th>
                 </tr>
