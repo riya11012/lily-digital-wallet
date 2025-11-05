@@ -234,14 +234,14 @@ export default function DashboardPage() {
                     selected={tempFromDate}
                     onChange={(date) => setTempFromDate(date)}
                     placeholderText="From"
-                    className="w-12 text-xs text-gray-500 placeholder-gray-500 bg-transparent cursor-pointer"
+                    
                     dateFormat="dd/MM/yyyy"
                     wrapperClassName="date-picker-wrapper"
                     popperClassName="date-picker-high-z-index"
                     popperPlacement="bottom-start"
                   />
                   <Calendar 
-                    className="h-3 w-3 text-gray-500 ml-1 cursor-pointer" 
+                    className="h-3 w-3 text-gray-500 ml-1 h-full cursor-pointer" 
                     onClick={() => fromDateRef.current?.setFocus()}
                   />
                 </div>
@@ -256,7 +256,6 @@ export default function DashboardPage() {
                     selected={tempToDate}
                     onChange={(date) => setTempToDate(date)}
                     placeholderText="To"
-                    className="w-12 text-xs text-gray-500 placeholder-gray-500 bg-transparent cursor-pointer"
                     dateFormat="dd/MM/yyyy"
                     wrapperClassName="date-picker-wrapper"
                     popperClassName="date-picker-high-z-index"
