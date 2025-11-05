@@ -1,231 +1,508 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+'use client'
+
+import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { Search, Plus, ChevronDown, MoreVertical, X, Calendar, ArrowRight } from 'lucide-react'
+import DatePicker from 'react-datepicker'
+import 'react-datepicker/dist/react-datepicker.css'
+
+interface ClinicalTrial {
+  id: string
+  name: string
+  status: 'Active' | 'Inactive'
+  phase: string
+  participants: number
+  startDate: string
+  endDate: string
+  principalInvestigator: string
+  sites: number
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+const clinicalTrials: ClinicalTrial[] = [
+  {
+    id: '1',
+    name: 'GIDF',
+    status: 'Active',
+    phase: 'Diabetes',
+    participants: 150,
+    startDate: '15/01/2024',
+    endDate: '15/12/2024',
+    principalInvestigator: 'Dr. Sarah Johnson',
+    sites: 12
+  },
+  {
+    id: '2',
+    name: 'GIDI',
+    status: 'Active',
+    phase: 'Diabetes',
+    participants: 85,
+    startDate: '20/02/2024',
+    endDate: '20/11/2024',
+    principalInvestigator: 'Dr. Michael Chen',
+    sites: 8
+  },
+  {
+    id: '3',
+    name: 'GN01',
+    status: 'Inactive',
+    phase: 'Diabetes',
+    participants: 200,
+    startDate: '10/03/2023',
+    endDate: '10/12/2023',
+    principalInvestigator: 'Dr. Emily Rodriguez',
+    sites: 15
+  },
+  {
+    id: '4',
+    name: 'GX7D',
+    status: 'Active',
+    phase: 'Diabetes ',
+    participants: 45,
+    startDate: '05/05/2024',
+    endDate: '05/12/2024',
+    principalInvestigator: 'Dr. David Wilson',
+    sites: 5
+  },
+  {
+    id: '5',
+    name: 'GZ9K',
+    status: 'Inactive',
+    phase: 'Diabetes',
+    participants: 120,
+    startDate: '01/01/2023',
+    endDate: '01/06/2024',
+    principalInvestigator: 'Dr. Robert Taylor',
+    sites: 6
   }
-}
+]
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
+export default function ClinicalTrialsPage() {
+  const router = useRouter()
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [phaseFilter, setPhaseFilter] = useState('')
+  const [fromDate, setFromDate] = useState<Date | null>(null)
+  const [toDate, setToDate] = useState<Date | null>(null)
+  const [tempFromDate, setTempFromDate] = useState<Date | null>(null)
+  const [tempToDate, setTempToDate] = useState<Date | null>(null)
+  const [showDropdown, setShowDropdown] = useState<string | null>(null)
+  const [showDeactivateModal, setShowDeactivateModal] = useState<boolean>(false)
+  const [trialToDeactivate, setTrialToDeactivate] = useState<ClinicalTrial | null>(null)
+  const [trials, setTrials] = useState<ClinicalTrial[]>(clinicalTrials)
+  const fromDateRef = useRef<any>(null)
+  const toDateRef = useRef<any>(null)
 
-/* Category button 3-line clamp effect */
-.category-item {
-  width: 200px;
-}
-.category-item p {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-}
+  const handleTrialAction = (trial: ClinicalTrial, event: React.MouseEvent) => {
+    event.stopPropagation()
+    setShowDropdown(showDropdown === trial.id ? null : trial.id)
+  }
 
-/* Small variant for category button */
-.category-item--sm {
-  width: 140px;
-}
-.category-item--sm svg {
-  width: 20px;
-  height: 20px;
-}
-.root-portal, html, body {
-  overflow: visible;
-}
+  const handleEditTrial = (trial: ClinicalTrial) => {
+    console.log('Edit Trial button clicked, navigating to /add-clinical-trial?edit=' + trial.id)
+    router.push(`/add-clinical-trial?edit=${trial.id}`)
+    setShowDropdown(null)
+  }
 
-/* React DatePicker Styles */
-.react-datepicker-wrapper {
-  display: inline-block;
-  padding: 0;
-  border: 0;
-  width: 100%;
-}
+  const closeDropdown = () => setShowDropdown(null)
 
-.react-datepicker {
-  font-family: inherit;
-  font-size: 0.875rem;
-  background-color: #fff;
-  color: #000;
-  border: 1px solid #aeaeae;
-  border-radius: 0.3rem;
-  display: inline-block;
-  position: relative;
-}
+  const handleDeactivateTrial = (trial: ClinicalTrial) => {
+    setTrialToDeactivate(trial)
+    setShowDeactivateModal(true)
+    setShowDropdown(null)
+  }
 
-.react-datepicker__triangle {
-  position: absolute;
-  left: 50px;
-}
+  const confirmDeactivate = () => {
+    if (trialToDeactivate) {
+      setTrials(prevTrials => 
+        prevTrials.map(trial => 
+          trial.id === trialToDeactivate.id 
+            ? { ...trial, status: 'Inactive' as const }
+            : trial
+        )
+      )
+      setShowDeactivateModal(false)
+      setTrialToDeactivate(null)
+    }
+  }
 
-.react-datepicker__header {
-  text-align: center;
-  background-color: #f0f0f0;
-  border-bottom: 1px solid #aeaeae;
-  border-top-left-radius: 0.3rem;
-  border-top-right-radius: 0.3rem;
-  padding-top: 8px;
-  position: relative;
-}
+  const cancelDeactivate = () => {
+    setShowDeactivateModal(false)
+    setTrialToDeactivate(null)
+  }
 
-.react-datepicker__current-month {
-  margin-top: 0;
-  color: #000;
-  font-weight: 500;
-  font-size: 0.875rem;
-}
-
-.react-datepicker__navigation {
-  background: none;
-  line-height: 1.7;
-  text-align: center;
-  cursor: pointer;
-  position: absolute;
-  top: 10px;
-  width: 0;
-  padding: 0;
-  border: none;
-  z-index: 1;
-  height: 32px;
-  width: 32px;
-  text-indent: -999em;
-  overflow: hidden;
-}
-
-.react-datepicker__navigation--previous {
-  left: 10px;
-}
-
-.react-datepicker__navigation--next {
-  right: 10px;
-}
-
-.react-datepicker__navigation:hover {
-  background-color: #f0f0f0;
-  border-radius: 50%;
-}
-
-.react-datepicker__day-names {
-  margin-bottom: 0.5rem;
-  text-align: center;
-}
-
-.react-datepicker__day-name {
-  color: #000;
-  display: inline-block;
-  width: 1.7rem;
-  line-height: 1.7;
-  text-align: center;
-  margin: 0.166rem;
-}
-
-.react-datepicker__month {
-  margin: 0.4rem;
-  text-align: center;
-}
-
-.react-datepicker__week {
-  white-space: nowrap;
-  line-height: 1.7;
-}
-
-.react-datepicker__day {
-  color: #000;
-  display: inline-block;
-  width: 1.7rem;
-  line-height: 1.7;
-  text-align: center;
-  margin: 0.166rem;
-  cursor: pointer;
-}
-
-.react-datepicker__day:hover {
-  border-radius: 0.3rem;
-  background-color: #f0f0f0;
-}
-
-.react-datepicker__day--selected {
-  background-color: #0066cc;
-  color: #fff;
-  border-radius: 0.3rem;
-}
-
-.react-datepicker__day--selected:hover {
-  background-color: #0066cc;
-}
-
-.react-datepicker__day--keyboard-selected {
-  background-color: #0066cc;
-  color: #fff;
-  border-radius: 0.3rem;
-}
-
-.react-datepicker__day--today {
-  font-weight: bold;
-}
-
-.react-datepicker__day--disabled {
-  color: #ccc;
-  cursor: default;
-}
-
-.react-datepicker__day--disabled:hover {
-  background-color: transparent;
-}
-
-/* High z-index for date picker */
-.date-picker-high-z-index {
-  z-index: 9999 !important;
-}
-
-.date-picker-high-z-index .react-datepicker {
-  z-index: 9999 !important;
-}
-
-.date-picker-high-z-index .react-datepicker__header {
-  background-color: #f0f0f0 !important;
-  color: #000 !important;
-}
-
-.date-picker-high-z-index .react-datepicker__current-month {
-  color: #000 !important;
-  font-weight: 500 !important;
-}
-
-/* Custom styles for the date picker input */
+  const parseDate = (dateStr: string): Date | null => {
+    if (!dateStr) return null;
+    // Parse dd/MM/yyyy format
+    const parts = dateStr.split('/').map(Number);
+    if (parts.length === 3) {
+      const [day, month, year] = parts;
+      if (day && month && year) {
+        const d = new Date(year, month - 1, day);
+        if (!isNaN(d.getTime())) return d;
+      }
+    }
+    return null;
+  };
 
 
-.react-datepicker__input-container input:focus {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
-}
+  const filteredTrials = trials.filter(trial => {
+    const searchLower = search.toLowerCase()
+    // Default to display fallbacks when fields are missing so search still works
+    const countryList = ((trial as any).countryRegion ?? ['US', 'PR']) as string[]
+    const languageList = ((trial as any).language ?? ['EN', 'ES']) as string[]
+    const haystack = [
+      trial.name,
+      trial.principalInvestigator,
+      trial.phase,
+      trial.status,
+      countryList.join(', '),
+      languageList.join(', ')
+    ]
+      .filter(Boolean)
+      .map(v => String(v).toLowerCase())
 
-/* Force width for wallet-invites date pickers */
-.wallet-invites-datepicker .react-datepicker__input-container input {
-  width: 48px !important; /* w-12 = 48px */
-}
+    if (search && !haystack.some(v => v.includes(searchLower))) {
+      return false
+    }
+    if (statusFilter && trial.status !== statusFilter) {
+      return false
+    }
+    if (phaseFilter && !trial.name.toLowerCase().includes(phaseFilter.toLowerCase())) {
+      return false
+    }
+    
+    // Date filtering
+    if (fromDate || toDate) {
+      const trialStartDate = parseDate(trial.startDate);
+      if (trialStartDate) {
+        if (fromDate && trialStartDate < fromDate) return false;
+        if (toDate && trialStartDate > toDate) return false;
+      } else {
+        return false;
+      }
+    }
+    
+    return true
+  })
 
-/* Force calendar to appear below */
-.react-datepicker-popper[data-placement^="bottom"] {
-  padding-top: 10px !important;
-}
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Active': return 'bg-green-100 text-green-800'
+      case 'Inactive': return 'bg-red-100 text-red-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
 
-.react-datepicker-popper[data-placement^="top"] {
-  transform: translateY(40px) !important;
-}
+  // Unique trial names for dropdown
+  const trialNames = Array.from(new Set(trials.map(t => t.name))).sort()
 
+  const clearFilters = () => {
+    setSearch('')
+    setStatusFilter('')
+    setPhaseFilter('')
+    setFromDate(null)
+    setToDate(null)
+    setTempFromDate(null)
+    setTempToDate(null)
+  }
+
+  const applyDateFilter = () => {
+    setFromDate(tempFromDate)
+    setToDate(tempToDate)
+  }
+
+  return (
+    <div className="min-h-screen bg-white mt-4 px-3 sm:px-6 md:px-10 py-4">
+      <div className="mb-4 border rounded-2xl overflow-hidden shadow-sm">
+        <div className="max-w-[1200px] max-h-[591px]">
+          {/* Header table (no scroll) */}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-base border-collapse table-auto sm:table-fixed">
+              <thead className="bg-gray-50 border-b border-gray-300 sticky top-0 z-10">
+                {/* Controls Row */}
+                <tr>
+                  <th colSpan={9} className="px-6 py-4 border-b border-gray-200 bg-gray-100">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+                      {/* Title - Always Left */}
+                      <div className="text-left w-full sm:w-auto">
+                        <h2 className="text-xl font-normal text-gray-800">Clinical Trials</h2>
+                      </div>
+
+                      {/* Controls - Right on Desktop, Stacked on Mobile */}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+                        <div className="relative w-[250px] sm:w-64">
+                          <input
+                            type="search"
+                            placeholder="Search"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full sm:w-64 px-4 py-2 font-normal text-sm border rounded-full"
+                          />
+                          <Search className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+                        </div>
+
+                        <button 
+                          onClick={() => router.push('/add-clinical-trial')}
+                          className="bg-[#007fb2] text-white px-4 py-2 h-9 rounded-full text-sm flex items-center gap-2"
+                        >
+                          <Plus className="h-4 w-4" />
+                          <span>Add Trial</span>
+                        </button>
+                      </div>
+                    </div>
+                  </th>
+                </tr>
+
+                {/* Filters Row */}
+                <tr>
+                  <th colSpan={9} className="px-6 py-3 border-b border-gray-300">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
+                        <span className="font-semibold">FILTER</span>
+                        
+                        <select
+                          value={phaseFilter}
+                          onChange={(e) => setPhaseFilter(e.target.value)}
+                          className="px-2 py-1 w-30 h-9 bg-gray-100 font-normal border border-gray-300 rounded-md text-xs"
+                        >
+                          <option value="">Trial Name</option>
+                          {trialNames.map(name => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                        </select>
+                        
+                        <select
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
+                          className="px-2 py-1 w-28 h-9 bg-gray-100 font-normal border-gray-300 rounded-md border text-xs"
+                        >
+                          <option value="">Status</option>
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                        </select>
+
+                        {/* Divider between filters and date */}
+                        <div className="h-9 w-px bg-gray-300 mx-2"></div>
+
+                        {/* Date Filters */}
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-700 text-sm">DATE</span>
+                          <div className="flex items-center bg-white border border-gray-300 rounded-lg h-9">
+                            {/* From Date */}
+                            <div className="relative flex items-center px-2 hover:bg-gray-50 rounded-l-lg">
+                              <DatePicker
+                                ref={fromDateRef}
+                                selected={tempFromDate}
+                                onChange={(date) => setTempFromDate(date)}
+                                placeholderText="From"
+                                className="w-16 text-xs text-gray-500 font-normal placeholder-gray-500 bg-transparent cursor-pointer"
+                                dateFormat="dd/MM/yyyy"
+                                wrapperClassName="date-picker-wrapper"
+                                popperClassName="date-picker-high-z-index"
+                                popperPlacement="bottom"
+                                portalId="root-portal"
+                              />
+                              <Calendar 
+                                className="h-3 w-3 text-gray-500 ml-1 h-full cursor-pointer" 
+                                onClick={() => fromDateRef.current?.setFocus()}
+                              />
+                            </div>
+                            
+                            {/* Divider */}
+                            <div className="h-5 w-px bg-gray-300"></div>
+                            
+                            {/* To Date */}
+                            <div className="relative flex items-center px-2 hover:bg-gray-50">
+                              <DatePicker
+                                ref={toDateRef}
+                                selected={tempToDate}
+                                onChange={(date) => setTempToDate(date)}
+                                placeholderText="To"
+                                className="w-16 text-xs text-gray-500 font-normal placeholder-gray-500 bg-transparent cursor-pointer"
+                                dateFormat="dd/MM/yyyy"
+                                wrapperClassName="date-picker-wrapper"
+                                popperClassName="date-picker-high-z-index"
+                                popperPlacement="bottom"
+                                portalId="root-portal"
+                              />
+                              <Calendar 
+                                className="h-3 w-3 text-gray-500 ml-1 cursor-pointer" 
+                                onClick={() => toDateRef.current?.setFocus()}
+                              />
+                            </div>
+                            
+                            {/* Apply Button - Integrated */}
+                            <button 
+                              className="bg-gray-400 hover:bg-gray-600 text-white px-2 h-full transition-colors flex items-center justify-center rounded-r-lg"
+                              onClick={applyDateFilter}
+                            >
+                              <ArrowRight className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* CLEAR FILTERS BUTTON */}
+                      {(search || statusFilter || phaseFilter || fromDate || toDate) && (
+                        <button
+                          onClick={clearFilters}
+                          className="px-3 py-1 text-xs border rounded-full mt-2 sm:mt-0 self-start sm:self-center"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+
+          {/* Scrollable body table */}
+          <div className="max-h-[150px] md:max-h-[230px] overflow-y-auto overflow-x-auto">
+            <table className="w-full min-w-[900px] text-base border-collapse table-auto sm:table-fixed">
+              <thead className="bg-gray-50 text-sm text-black">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-semibold bg-gray-100">Trial Code</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold bg-gray-100">Disease State</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold bg-gray-100">Country/Region</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold bg-gray-100">Languages</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold bg-gray-100">Status</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold bg-gray-100">Start Date</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold bg-gray-100">End Date</th>
+                  <th className="px-3 py-2 w-20 bg-gray-100"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTrials.length === 0 ? (
+                  <tr className="bg-white">
+                    <td colSpan={8} className="text-center py-20 text-gray-500">
+                      No trials found.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTrials.map((trial) => (
+                    <tr key={trial.id} className="border-b bg-white hover:bg-gray-50 text-xs">
+                      <td className="px-3 py-2">{trial.name}</td>
+                      <td className="px-3 py-2">{trial.phase}</td>
+                        <td className="px-3 py-2">
+                        {(trial as any).countryRegion ? (trial as any).countryRegion.join(', ') : 'US, PR'}
+                      </td>
+                      <td className="px-3 py-2">
+                        {(trial as any).language ? (trial as any).language.join(', ') : 'EN, ES'}
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center space-x-1">
+                          <div className={`w-2 h-2 rounded-full ${trial.status === 'Active' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                          <span>{trial.status}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">{trial.startDate}</td>
+                      <td className="px-3 py-2">{trial.endDate}</td>
+                      <td className="px-3 py-2 relative">
+                        <button
+                          onClick={(e) => handleTrialAction(trial, e)}
+                          className="p-1 hover:bg-gray-100 rounded"
+                        >
+                          <MoreVertical className="h-4 w-4 text-gray-400" />
+                        </button>
+                        {showDropdown === trial.id && (
+                          <div className="absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg z-10 border text-xs">
+                            <button 
+                              onClick={() => handleEditTrial(trial)}
+                              className="block w-full text-left px-3 py-2 text-gray-700 hover:bg-gray-100"
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              onClick={() => handleDeactivateTrial(trial)}
+                              className="block w-full text-left px-3 py-2 text-gray-700 hover:bg-gray-100"
+                            >
+                              Deactivate
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Deactivate Confirmation Modal */}
+      {showDeactivateModal && trialToDeactivate && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Deactivate Clinical Trial</h2>
+              <button
+                onClick={cancelDeactivate}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Are you sure?</h3>
+                <p className="text-sm text-gray-600">
+                  You are about to deactivate <strong>{trialToDeactivate.name}</strong>. 
+                  This action will change the trial status to Inactive.
+                </p>
+              </div>
+
+              {/* Trial Details */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Trial Name:</span>
+                    <div className="font-medium text-gray-900">{trialToDeactivate.name}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Phase:</span>
+                    <div className="font-medium text-gray-900">{trialToDeactivate.phase}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Participants:</span>
+                    <div className="font-medium text-gray-900">{trialToDeactivate.participants}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Sites:</span>
+                    <div className="font-medium text-gray-900">{trialToDeactivate.sites}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex space-x-3">
+                <button
+                  onClick={cancelDeactivate}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeactivate}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Deactivate Trial
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
