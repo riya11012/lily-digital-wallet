@@ -1,542 +1,231 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
 
-'use client';
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
 
-import React, { useState, useMemo, useRef } from 'react';
-import StatusBadge from './StatusBadge';
-import ResendButton from './ResendButton';
-import { WalletInvitesTableProps } from './Types';
-import AddInviteModal from './AddInviteModal';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { Calendar, ArrowRight ,Search} from 'lucide-react';
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
 
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
 
+/* Category button 3-line clamp effect */
+.category-item {
+  width: 200px;
+}
+.category-item p {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
 
-type SortDirection = 'asc' | 'desc';
-type SortableColumn = keyof WalletInvitesTableProps['data'][0];
-type GroupByOption = 'trial' | 'country' | 'language' | null;
+/* Small variant for category button */
+.category-item--sm {
+  width: 140px;
+}
+.category-item--sm svg {
+  width: 20px;
+  height: 20px;
+}
+.root-portal, html, body {
+  overflow: visible;
+}
 
-const WalletInvitesTable: React.FC<WalletInvitesTableProps> = ({ data = [], onResend }) => {
-  const [search, setSearch] = useState('');
-  const [sortColumn, setSortColumn] = useState<SortableColumn | null>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [groupBy, setGroupBy] = useState<GroupByOption>(null);
-  const [filters, setFilters] = useState<{ [key: string]: string }>({});
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [tempStartDate, setTempStartDate] = useState<Date | null>(null);
-  const [tempEndDate, setTempEndDate] = useState<Date | null>(null);
-  const startDateRef = useRef<any>(null);
-  const endDateRef = useRef<any>(null);
+/* React DatePicker Styles */
+.react-datepicker-wrapper {
+  display: inline-block;
+  padding: 0;
+  border: 0;
+  width: 100%;
+}
 
-  const parseDate = (dateStr: string): Date | null => {
-    if (!dateStr) return null;
-    // Try native Date parsing first (handles ISO strings like 2025-09-01T12:00:00Z)
-    const iso = new Date(dateStr);
-    if (!isNaN(iso.getTime())) return iso;
+.react-datepicker {
+  font-family: inherit;
+  font-size: 0.875rem;
+  background-color: #fff;
+  color: #000;
+  border: 1px solid #aeaeae;
+  border-radius: 0.3rem;
+  display: inline-block;
+  position: relative;
+}
 
-    // Fallback: parse dd/MM/yyyy
-    const parts = dateStr.split('/').map(Number);
-    if (parts.length === 3) {
-      const [day, month, year] = parts;
-      if (day && month && year) {
-        const d = new Date(year, month - 1, day);
-        if (!isNaN(d.getTime())) return d;
-      }
-    }
-    return null;
-  };
+.react-datepicker__triangle {
+  position: absolute;
+  left: 50px;
+}
 
-  const handleSort = (column: SortableColumn) => {
-    if (sortColumn === column) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortColumn(column);
-      setSortDirection('asc');
-    }
-  };
+.react-datepicker__header {
+  text-align: center;
+  background-color: #f0f0f0;
+  border-bottom: 1px solid #aeaeae;
+  border-top-left-radius: 0.3rem;
+  border-top-right-radius: 0.3rem;
+  padding-top: 8px;
+  position: relative;
+}
 
-  const handleFilterChange = (key: string, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-  };
+.react-datepicker__current-month {
+  margin-top: 0;
+  color: #000;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
 
-  const clearFilters = () => {
-    setFilters({});
-    setGroupBy(null);
-    setSearch('');
-    setStartDate(null);
-    setEndDate(null);
-    setTempStartDate(null);
-    setTempEndDate(null);
-  };
+.react-datepicker__navigation {
+  background: none;
+  line-height: 1.7;
+  text-align: center;
+  cursor: pointer;
+  position: absolute;
+  top: 10px;
+  width: 0;
+  padding: 0;
+  border: none;
+  z-index: 1;
+  height: 32px;
+  width: 32px;
+  text-indent: -999em;
+  overflow: hidden;
+}
 
-  const applyDateFilter = () => {
-    setStartDate(tempStartDate);
-    setEndDate(tempEndDate);
-  };
+.react-datepicker__navigation--previous {
+  left: 10px;
+}
 
-  const handleSearchChange = (value: string) => {
-    setSearch(value);
-  };
+.react-datepicker__navigation--next {
+  right: 10px;
+}
 
-  const filteredData = useMemo(() => {
-    return data
-      .filter((row) => {
-        const searchLower = search.toLowerCase();
-        const matchesSearch =
-  row.trial.toLowerCase().includes(searchLower) ||
-  row.language.toLowerCase().includes(searchLower) ||
-  row.mobile.includes(searchLower) ||
-  row.country.toLowerCase().includes(searchLower) ||
-  row.cardId.toLowerCase().includes(searchLower) ||
-  row.requestId.toLowerCase().includes(searchLower) ||
-  row.status.toLowerCase().includes(searchLower);
+.react-datepicker__navigation:hover {
+  background-color: #f0f0f0;
+  border-radius: 50%;
+}
 
+.react-datepicker__day-names {
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
 
-        const matchesFilters = Object.entries(filters).every(([key, val]) => {
-          if (!val) return true;
-          return (row as any)[key]?.toString().toLowerCase() === val.toLowerCase();
-        });
+.react-datepicker__day-name {
+  color: #000;
+  display: inline-block;
+  width: 1.7rem;
+  line-height: 1.7;
+  text-align: center;
+  margin: 0.166rem;
+}
 
-        let matchesDate = true;
-        if (startDate || endDate) {
-          const rowDate = parseDate(row.sentDate);
-          if (rowDate) {
-            if (startDate && rowDate < startDate) matchesDate = false;
-            if (endDate && rowDate > endDate) matchesDate = false;
-          } else {
-            matchesDate = false;
-          }
-        }
+.react-datepicker__month {
+  margin: 0.4rem;
+  text-align: center;
+}
 
-        return matchesSearch && matchesFilters && matchesDate;
-      })
-      .sort((a, b) => {
-        if (!sortColumn) return 0;
+.react-datepicker__week {
+  white-space: nowrap;
+  line-height: 1.7;
+}
 
-        const valA = a[sortColumn];
-        const valB = b[sortColumn];
+.react-datepicker__day {
+  color: #000;
+  display: inline-block;
+  width: 1.7rem;
+  line-height: 1.7;
+  text-align: center;
+  margin: 0.166rem;
+  cursor: pointer;
+}
 
-        if (valA == null) return 1;
-        if (valB == null) return -1;
+.react-datepicker__day:hover {
+  border-radius: 0.3rem;
+  background-color: #f0f0f0;
+}
 
-        if (sortColumn === 'sentDate') {
-          const dateA = parseDate(valA as string)?.getTime() ?? 0;
-          const dateB = parseDate(valB as string)?.getTime() ?? 0;
-          return sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
-        }
+.react-datepicker__day--selected {
+  background-color: #0066cc;
+  color: #fff;
+  border-radius: 0.3rem;
+}
 
-        if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-        if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-        return 0;
-      });
-  }, [data, search, filters, sortColumn, sortDirection, startDate, endDate]);
+.react-datepicker__day--selected:hover {
+  background-color: #0066cc;
+}
 
-  const groupedData = useMemo(() => {
-    if (!groupBy) return null;
-    return filteredData.reduce((groups: { [key: string]: typeof filteredData }, row) => {
-      const key = (row as any)[groupBy] || 'Other';
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(row);
-      return groups;
-    }, {});
-  }, [filteredData, groupBy]);
+.react-datepicker__day--keyboard-selected {
+  background-color: #0066cc;
+  color: #fff;
+  border-radius: 0.3rem;
+}
 
-  const toggleGroup = (group: string) => {
-    setExpandedGroups((prev) => ({ ...prev, [group]: !prev[group] }));
-  };
+.react-datepicker__day--today {
+  font-weight: bold;
+}
 
-  const renderSortIcon = (column: SortableColumn) => {
-    if (sortColumn !== column) return '⬍';
-    return sortDirection === 'asc' ? '▲' : '▼';
-  };
+.react-datepicker__day--disabled {
+  color: #ccc;
+  cursor: default;
+}
 
-  const renderColGroup = () => (
-    <colgroup>
-      <col style={{ width: '14%' }} />
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '10%' }} />
-      <col style={{ width: '10%' }} />
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '10%' }} />
-    </colgroup>
-  );
+.react-datepicker__day--disabled:hover {
+  background-color: transparent;
+}
 
- const renderTableHeader = () => (
-  <thead className="bg-gray-50 border-b border-gray-300 sticky top-0 z-10">
-    {/* Controls Row */}
-   <tr>
-  <th colSpan={9} className="px-6 py-4 border-b border-gray-200 bg-gray-100">
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+/* High z-index for date picker */
+.date-picker-high-z-index {
+  z-index: 9999 !important;
+}
 
-      {/* Title - Always Left */}
-     <div className="text-left w-full sm:w-auto">
-      <h2 className="font-[IBM Plex Sans] font-normal text-[25px] leading-[30px] tracking-[0px] text-center align-middle capitalize text-gray-800">
-  Wallet Invites
-</h2>
+.date-picker-high-z-index .react-datepicker {
+  z-index: 9999 !important;
+}
 
-      </div>
+.date-picker-high-z-index .react-datepicker__header {
+  background-color: #f0f0f0 !important;
+  color: #000 !important;
+}
 
-      {/* Controls - Right on Desktop, Stacked on Mobile */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4  ">
-<div className="relative w-[328px]">
-  <input
-    type="search"
-    placeholder="Search"
-    value={search}
-    onChange={(e) => setSearch(e.target.value)}
-    className="w-full h-[40px] px-4 font-normal text-sm border border-gray-300 rounded-[30px] focus:outline-none focus:ring-1 focus:ring-gray-400"
-  />
-  <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600" />
-</div>
+.date-picker-high-z-index .react-datepicker__current-month {
+  color: #000 !important;
+  font-weight: 500 !important;
+}
 
-        <button
-          className="bg-[#0080B2] text-white px-4 py-2 h-9 rounded-full  text-sm flex items-center gap-2"
-          onClick={() => setShowAddModal(true)}
-        >
-          
-          <span>Add Invite</span>
-          <span className="flex items-center justify-center w-6 h-6 rounded-full border border-white text-lg text-white">
-  ＋
-</span>
-
-
-        </button>
-      </div>
-
-    </div>
-  </th>
-</tr>
+/* Custom styles for the date picker input */
 
 
-    {/* Filters Row */}
-   <tr>
-  <th colSpan={9} className="px-6 py-3 border-b border-gray-300">
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs">
+.react-datepicker__input-container input:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
 
-      {/* GROUP + FILTERS stacked on left on mobile */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
-        <span className="font-semibold">GROUP</span>
-        <select
-          value={groupBy || ''}
-          onChange={(e) => setGroupBy(e.target.value as GroupByOption)}
-          className="px-2 py-1 w-28 h-9 bg-gray-100 font-normal rounded-md border"
-        >
-          <option value="">Select</option>
-          <option value="trial">Trial</option>
-          <option value="country">Country</option>
-          <option value="language">Language</option>
-        </select>
+/* Force width for wallet-invites date pickers */
+.wallet-invites-datepicker .react-datepicker__input-container input {
+  width: 48px !important; /* w-12 = 48px */
+}
 
-          {/* Divider between filters and date */}
-          <div className="h-9 w-px bg-gray-300 mx-2"></div>
-        <span className="font-semibold">FILTER</span>
-        {['trial', 'country', 'language', 'status'].map((key, index) => (
-          <select
-            key={key}
-            value={filters[key] || ''}
-            onChange={(e) => handleFilterChange(key, e.target.value)}
-            className="px-2 py-1 w-30 h-9 bg-gray-100 font-normal rounded-md border"
-          >
-            <option value="">
-              {key === 'trial'
-                ? 'Clinical Trial'
-                : key === 'country'
-                ? 'Country/Region'
-                : key.charAt(0).toUpperCase() + key.slice(1)}
-            </option>
-            {[...new Set(data.map((row) => (row as any)[key]).filter(Boolean))].map((val) => (
-              <option key={val} value={val}>
-                {val}
-              </option>
-            ))}
-          </select>
-        ))}
+/* Force calendar to appear below */
+.react-datepicker-popper[data-placement^="bottom"] {
+  padding-top: 10px !important;
+}
 
-        {/* Divider between filters and date */}
-        <div className="h-9 w-px bg-gray-300 mx-2"></div>
+.react-datepicker-popper[data-placement^="top"] {
+  transform: translateY(40px) !important;
+}
 
-        {/* DATE Pickers */}
-        <div className="flex items-center gap-2">
-         
-          <div className="flex items-center bg-white border border-gray-300 rounded-lg h-9">
-            {/* From Date */}
-            <div className="relative flex items-center px-2 hover:bg-gray-50 rounded-l-lg">
-              <DatePicker
-                ref={startDateRef}
-                selected={tempStartDate}
-                onChange={(date: Date | null) => setTempStartDate(date)}
-                placeholderText="From"
-                className="w-16 text-xs text-gray-500 font-normal placeholder-gray-500 bg-transparent cursor-pointer"
-                dateFormat="dd/MM/yyyy"
-                wrapperClassName="date-picker-wrapper"
-                popperClassName="date-picker-high-z-index"
-                popperPlacement="bottom"
-                portalId="root-portal"
-              />
-              <Calendar 
-                className="h-3 w-3 text-gray-500 ml-1 h-full cursor-pointer" 
-                onClick={() => startDateRef.current?.setFocus()}
-              />
-            </div>
-            
-            {/* Divider */}
-            <div className="h-5 w-px bg-gray-300"></div>
-            
-            {/* To Date */}
-            <div className="relative flex items-center px-2 hover:bg-gray-50">
-              <DatePicker
-                ref={endDateRef}
-                selected={tempEndDate}
-                onChange={(date: Date | null) => setTempEndDate(date)}
-                placeholderText="To"
-                className="w-16 text-xs text-gray-500 font-normal placeholder-gray-500 bg-transparent cursor-pointer"
-                dateFormat="dd/MM/yyyy"
-                wrapperClassName="date-picker-wrapper"
-                popperClassName="date-picker-high-z-index"
-                popperPlacement="bottom"
-                portalId="root-portal"
-              />
-              <Calendar 
-                className="h-3 w-3 text-gray-500 ml-1 cursor-pointer" 
-                onClick={() => endDateRef.current?.setFocus()}
-              />
-            </div>
-            
-            {/* Apply Button - Integrated */}
-            <button 
-              className="bg-gray-400 hover:bg-gray-600 text-white px-2 h-full transition-colors flex items-center justify-center rounded-r-lg"
-              onClick={applyDateFilter}
-            >
-              <ArrowRight className="h-3 w-3" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* CLEAR FILTERS BUTTON */}
-      {(Object.keys(filters).length > 0 || groupBy || search || startDate || endDate) && (
-        <button
-          onClick={clearFilters}
-          className="px-3 py-1 text-xs border rounded-full mt-2 sm:mt-0 self-start sm:self-center"
-        >
-          ✕
-        </button>
-      )}
-    </div>
-  </th>
-</tr>
-
-
-    {/* Column Headers Row */}
-    
-  </thead>
-);
-
-
-  const renderTableRows = (rows: typeof filteredData) =>
-    rows.length === 0 ? (
-      <tr className="bg-white  ">
-         <td colSpan={11} className="text-center py-20 text-gray-500">
-          No invites found.
-        </td>
-      </tr>
-    ) : (
-      rows.map((row) => (
-        <tr key={row.id} className="border-b bg-white hover:bg-gray-50  text-xs">
-         
-        <td className="px-3 py-2 max-w-[150px]">
-  <div className=" overflow-auto whitespace-nowrap">
-    {row.trial}
-  </div>
-</td>
-
-          <td className="px-2 py-2 pl-3">{row.language}</td>
-          <td className="px-3 py-2 pl-3">{row.mobile}</td>
-           <td className="px-3 py-2 pl-3">{row.country}</td>
-                 
-          <td className="px-2 py-2 pl-6 ">{row.cardId}</td>
-          <td className="px-3 py-2 pl-2">{row.requestId}</td>
-          <td className="px-3 py-2 pl-2 whitespace-nowrap">
-            {row.sentDate
-              ? new Date(row.sentDate).toLocaleString('en-GB', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              : '-'}
-          </td>
-          <td className="px-3 py-2 pl-2">
-            <StatusBadge status={row.status} />
-          </td>
-          <td className="px-3 py-2 pl-2">
-            <ResendButton status={row.status} onResend={() => onResend(row.id)} />
-          </td>
-        </tr>
-      ))
-    );
-
-  return (
-  <div className=" mt-4 px-3 sm:px-6 md:px-10 py-4">
-
-      {/* Table (Flat or Grouped) */}
-    {!groupBy ? (
-      <div className="mb-4 border rounded-2xl overflow-hidden shadow-sm">
-        <div className="max-w-[1200px] max-h-[591px]">
-          {/* Header table (no scroll) */}
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-base border-collapse table-auto sm:table-fixed">
-              {renderColGroup()}
-              {renderTableHeader()}
-            </table>
-          </div>
-          {/* Scrollable body table */}
-         <div className="max-h-[150px] md:max-h-[230px] overflow-y-auto overflow-x-auto">
-
-            <table className="w-full min-w-[900px] text-base border-collapse table-auto sm:table-fixed">
-  {renderColGroup()}
-<thead className="bg-gray-50 text-sm text-black  ">
-    <tr>
-     {[
-  { label: 'Clinical trial', key: 'trial' },
-  { label: 'Language', key: 'language' },
-  { label: 'Mobile', key: 'mobile' },
-  { label: 'Country/Region', key: 'country' },
-  { label: 'Card ID', key: 'cardId' },
-  { label: 'Request ID', key: 'requestId' },
-  { label: 'Sent date', key: 'sentDate' },
-  { label: 'Status', key: 'status' },
-].map(({ label, key }) => {
-  const reducedPaddingKeys = ['country', 'cardId', 'requestId', 'status','sentDate'];
-  const paddingClass = reducedPaddingKeys.includes(key) ? 'px-1' : 'px-3';
- const extraSpaceClass = key === 'cardId' ? 'pl-5' : '';
-  return (
-   <th
-  key={key}
-  className={`${paddingClass} ${extraSpaceClass} py-2 cursor-pointer text-left text-sm font-sans bg-gray-100 font-bold`}
-  onClick={() => handleSort(key as SortableColumn)}
->
-  <div className="flex  items-center gap-1">
-    <span className="font-semibold">{label}</span>
-    <span>{renderSortIcon(key as SortableColumn)}</span>
-  </div>
-</th>
-
-  );
-})}
-
-      <th className="px-2 py-2 w-20 bg-gray-100  overflow-x-auto"></th>
-    </tr>
-  </thead>
-  <tbody>{renderTableRows(filteredData)}</tbody>
-</table>
-
-          </div>
-        </div>
-      </div>
-    ) : (
-      // ✅ grouped table view
-      <div className="mb-4 border rounded-2xl overflow-hidden shadow-sm">
-        {/* Header table (no scroll) */}
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-base border-collapse table-auto sm:table-fixed">
-            {renderColGroup()}
-            {renderTableHeader()}
-          </table>
-        </div>
-        {/* Scrollable grouped body table */}
-        <div className="max-h-[400px] overflow-y-auto overflow-x-auto">
-          <table className="w-full min-w-[900px] text-base border-collapse table-auto sm:table-fixed">
-            {renderColGroup()}
-            <tbody>
-              {Object.entries(groupedData ?? {}).map(([group, rows]) => (
-                <React.Fragment key={group}>
-                  <tr className="bg-gray-100">
-                    <td colSpan={9} className="px-4 py-3">
-                      <button
-                        onClick={() => toggleGroup(group)}
-                        className="w-full flex rounded-2xl justify-between items-center bg-gray-200 px-4 py-3 text-left font-medium text-gray-700 hover:bg-gray-200"
-                      >
-                        <span>
-                          {groupBy?.charAt(0).toUpperCase() + groupBy?.slice(1)}: {group} ({rows.length})
-                        </span>
-                        <span>{expandedGroups[group] ? '−' : '+'}</span>
-                      </button>
-                    </td>
-                  </tr>
-
-                  {expandedGroups[group] && (
-                    <>
-                      {/* Table headers per group */}
-                      <tr className="bg-gray-50 text-gray-700 font-semibold text-xs">
-                        <td className="px-3 py-2">Clinical trial</td>
-                        <td className="px-3 py-2">Language</td>
-                        <td className="px-3 py-2">Mobile</td>
-                        <td className="px-3 py-2">Country</td>
-                        <td className="px-3 py-2">Card ID</td>
-                        <td className="px-3 py-2">Request ID</td>
-                        <td className="px-3 py-2">Sent date</td>
-                   
-                  
-                        <td className="px-3 py-2 hidden sm:table-cell">Status</td>
-                        <td className="px-3 py-2 hidden sm:table-cell"></td>
-                      </tr>
-
-                      {/* Table rows */}
-                      {rows.map((row) => (
-                        <tr key={row.id} className="border-b bg-white hover:bg-gray-50 text-xs">
-                          <td className="px-3 py-2 max-w-[150px] whitespace-nowrap overflow-auto">{row.trial}
-                            {/* Mobile-only actions */}
-                            <div className="sm:hidden mt-1 flex items-center gap-2">
-                              <ResendButton status={row.status} onResend={() => onResend(row.id)} />
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 pl-3">{row.language}</td>
-                          <td className="px-3 py-2 pl-3">{row.mobile}</td>
-                          <td className="px-3 py-2 pl-3">{row.country}</td>
-                          <td className="px-3 py-2 pl-2">{row.cardId}</td>
-                          <td className="px-3 py-2 pl-2">{row.requestId}</td>
-                          <td className="px-3 py-2 pl-2">
-                            {row.sentDate
-                              ? new Date(row.sentDate).toLocaleString('en-GB', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
-                              : '-'}
-                          </td>
-                          <td className="px-3 py-2 hidden sm:table-cell">
-                            <StatusBadge status={row.status} />
-                          </td>
-                          <td className="px-3 py-2">
-                            <ResendButton status={row.status} onResend={() => onResend(row.id)} />
-                          </td>
-                        </tr>
-                      ))}
-                    </>
-                  )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    )}
-
-      
-
-      <AddInviteModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} />
-    </div>
-  );
-};
-
-export default WalletInvitesTable;
