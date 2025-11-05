@@ -189,12 +189,10 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-white mt-4 px-3 sm:px-6 md:px-10 py-4">
       <div className="mb-4 border rounded-2xl overflow-hidden shadow-sm">
-        <div className="max-w-[1300px]">
-          {/* Header table (no scroll) */}
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-base border-collapse table-auto sm:table-fixed">
-              {renderColGroup()}
-              <thead className="bg-gray-50 border-b border-gray-300 sticky top-0 z-10">
+        <div className="max-w-[1300px] max-h-[150px] md:max-h-[550px] overflow-y-auto overflow-x-hidden">
+          <table className="w-full min-w-[900px] text-base border-collapse table-auto sm:table-fixed">
+            {renderColGroup()}
+            <thead className="bg-gray-50 border-b border-gray-300 sticky top-0 z-10">
                 {/* Controls Row */}
                 <tr>
                   <th colSpan={8} className="px-6 py-4 border-b border-gray-200 bg-gray-100">
@@ -332,15 +330,8 @@ export default function DashboardPage() {
                     </div>
                   </th>
                 </tr>
-              </thead>
-            </table>
-          </div>
-
-          {/* Scrollable body table */}
-          <div className="max-h-[150px] md:max-h-[400px] overflow-y-auto overflow-x-auto">
-            <table className="w-full min-w-[900px] text-base border-collapse table-auto sm:table-fixed">
-              {renderColGroup()}
-              <tbody>
+            </thead>
+            <tbody>
                 {trials.map(trial => {
                   const trialUsers = filteredUsers.filter(user => user.trial === trial.name)
                   return (
@@ -427,10 +418,9 @@ export default function DashboardPage() {
                       )}
                     </React.Fragment>
                   )
-                })}
-              </tbody>
-            </table>
-          </div>
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 
