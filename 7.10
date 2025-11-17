@@ -1,541 +1,371 @@
 'use client';
 
-import React, { useState, useMemo, useRef } from 'react';
-import StatusBadge from './statusbadge';
-import ResendButton from './resendbutton';
-import { WalletInvitesTableProps } from './types';
-import AddInviteModal from './AddInviteModal';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { Calendar, ArrowRight, Search, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
+interface ValidationErrors {
+  email?: string;
+  password?: string;
+  general?: string;
+}
 
+export default function LoginCard() {
+  const { setUser } = useAuth();
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  });
+  const [rememberMe, setRememberMe] = useState(false);
+  const [errors, setErrors] = useState<ValidationErrors>({});
+  const [touched, setTouched] = useState({
+    email: false,
+    password: false,
+  });
 
-type SortDirection = 'asc' | 'desc';
-type SortableColumn = keyof WalletInvitesTableProps['data'][0];
-type GroupByOption = 'trial' | 'country' | 'language' | null;
+  // Load remembered email on component mount
+  useEffect(() => {
+    const rememberedEmail = localStorage.getItem('rememberMe_email');
+    if (rememberedEmail) {
+      setFormData(prev => ({ ...prev, email: rememberedEmail }));
+      setRememberMe(true);
+    }
+  }, []);
 
-const WalletInvitesTable: React.FC<WalletInvitesTableProps> = ({ data = [], onResend }) => {
-  const [search, setSearch] = useState('');
-  const [sortColumn, setSortColumn] = useState<SortableColumn | null>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [groupBy, setGroupBy] = useState<GroupByOption>(null);
-  const [filters, setFilters] = useState<{ [key: string]: string }>({});
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [tempStartDate, setTempStartDate] = useState<Date | null>(null);
-  const [tempEndDate, setTempEndDate] = useState<Date | null>(null);
-  const startDateRef = useRef<any>(null);
-  const endDateRef = useRef<any>(null);
+  // Email validation regex
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  const parseDate = (dateStr: string): Date | null => {
-    if (!dateStr) return null;
-    // Try native Date parsing first (handles ISO strings like 2025-09-01T12:00:00Z)
-    const iso = new Date(dateStr);
-    if (!isNaN(iso.getTime())) return iso;
-
-    // Fallback: parse dd/MM/yyyy
-    const parts = dateStr.split('/').map(Number);
-    if (parts.length === 3) {
-      const [day, month, year] = parts;
-      if (day && month && year) {
-        const d = new Date(year, month - 1, day);
-        if (!isNaN(d.getTime())) return d;
-      }
+  // Validate email format
+  const validateEmail = (email: string): string | null => {
+    if (!email.trim()) {
+      return 'Email is required';
+    }
+    if (!emailRegex.test(email)) {
+      return 'Please enter a valid email address';
     }
     return null;
   };
 
-  const handleSort = (column: SortableColumn) => {
-    if (sortColumn === column) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortColumn(column);
-      setSortDirection('asc');
+  // Validate password
+  const validatePassword = (password: string): string | null => {
+    if (!password.trim()) {
+      return 'Password is required';
+    }
+    if (password.length < 6) {
+      return 'Password must be at least 6 characters';
+    }
+    return null;
+  };
+
+  // Validate all fields
+  const validateForm = (): boolean => {
+    const newErrors: ValidationErrors = {};
+
+    const emailError = validateEmail(formData.email);
+    if (emailError) newErrors.email = emailError;
+
+    const passwordError = validatePassword(formData.password);
+    if (passwordError) newErrors.password = passwordError;
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value,
+    });
+
+    // Clear error when user starts typing
+    if (errors[name as keyof ValidationErrors]) {
+      setErrors({
+        ...errors,
+        [name]: undefined,
+      });
     }
   };
 
-  const handleFilterChange = (key: string, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name } = e.target;
+    setTouched({
+      ...touched,
+      [name]: true,
+    });
+
+    // Validate on blur
+    if (name === 'email') {
+      const emailError = validateEmail(formData.email);
+      if (emailError) {
+        setErrors({ ...errors, email: emailError });
+      }
+    } else if (name === 'password') {
+      const passwordError = validatePassword(formData.password);
+      if (passwordError) {
+        setErrors({ ...errors, password: passwordError });
+      }
+    }
   };
 
-  const clearFilters = () => {
-    setFilters({});
-    setGroupBy(null);
-    setSearch('');
-    setStartDate(null);
-    setEndDate(null);
-    setTempStartDate(null);
-    setTempEndDate(null);
-  };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  const applyDateFilter = () => {
-    setStartDate(tempStartDate);
-    setEndDate(tempEndDate);
-  };
+    // Mark all fields as touched
+    setTouched({
+      email: true,
+      password: true,
+    });
 
-  const handleSearchChange = (value: string) => {
-    setSearch(value);
-  };
+    // Validate form
+    if (!validateForm()) {
+      toast.error('Please fix the errors below');
+      return;
+    }
 
-  const filteredData = useMemo(() => {
-    return data
-      .filter((row) => {
-        const searchLower = search.toLowerCase();
-        const matchesSearch =
-  row.trial.toLowerCase().includes(searchLower) ||
-  row.language.toLowerCase().includes(searchLower) ||
-  row.mobile.includes(searchLower) ||
-  row.country.toLowerCase().includes(searchLower) ||
-  row.cardId.toLowerCase().includes(searchLower) ||
-  row.requestId.toLowerCase().includes(searchLower) ||
-  row.status.toLowerCase().includes(searchLower);
+    setIsLoading(true);
+    setErrors({});
 
+    try {
+      console.log('[LoginCard] Sending login request with credentials: include');
 
-        const matchesFilters = Object.entries(filters).every(([key, val]) => {
-          if (!val) return true;
-          return (row as any)[key]?.toString().toLowerCase() === val.toLowerCase();
-        });
-
-        let matchesDate = true;
-        if (startDate || endDate) {
-          const rowDate = parseDate(row.sentDate);
-          if (rowDate) {
-            if (startDate && rowDate < startDate) matchesDate = false;
-            if (endDate && rowDate > endDate) matchesDate = false;
-          } else {
-            matchesDate = false;
-          }
-        }
-
-        return matchesSearch && matchesFilters && matchesDate;
-      })
-      .sort((a, b) => {
-        if (!sortColumn) return 0;
-
-        const valA = a[sortColumn];
-        const valB = b[sortColumn];
-
-        if (valA == null) return 1;
-        if (valB == null) return -1;
-
-        if (sortColumn === 'sentDate') {
-          const dateA = parseDate(valA as string)?.getTime() ?? 0;
-          const dateB = parseDate(valB as string)?.getTime() ?? 0;
-          return sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
-        }
-
-        if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-        if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-        return 0;
+      const response = await fetch('/api/auth/login', {
+        credentials: 'include',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email.trim(),
+          password: formData.password,
+          rememberMe,
+        }),
       });
-  }, [data, search, filters, sortColumn, sortDirection, startDate, endDate]);
 
-  const groupedData = useMemo(() => {
-    if (!groupBy) return null;
-    return filteredData.reduce((groups: { [key: string]: typeof filteredData }, row) => {
-      const key = (row as any)[groupBy] || 'Other';
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(row);
-      return groups;
-    }, {});
-  }, [filteredData, groupBy]);
+      const data = await response.json();    
 
-  const toggleGroup = (group: string) => {
-    setExpandedGroups((prev) => ({ ...prev, [group]: !prev[group] }));
+      if (response.ok) {
+        // Store token if provided
+        if (data.token) {
+          localStorage.setItem('authToken', data.token);
+        }
+
+        //Transform login response to match User interface
+        const normalizedUser = {
+          id: String(data.user.id),
+          first_name: data.user.firstName,
+          last_name: data.user.lastName,
+          email_id: data.user.email,
+          role_id: data.user.roleId,
+          role: {
+            id: data.user.roleId,
+            role_name: data.user.role,
+          },
+        };
+
+        localStorage.setItem('user', JSON.stringify(normalizedUser));
+        setUser(normalizedUser);
+        
+        // ✅ Store email if "remember me" is checked
+        if (rememberMe) {
+          localStorage.setItem('rememberMe_email', formData.email.trim());
+        } else {
+          localStorage.removeItem('rememberMe_email');
+        }
+        
+        toast.success('Login successful!');
+
+        // Reset form
+        setFormData({ email: '', password: '' });
+        setRememberMe(false);
+
+        //Role-based redirect
+        let redirectPath = '/users'; // Default for SUPER_ADMIN
+        
+        if (data.user.roleId === 2 || data.user.roleId === 3) {
+          redirectPath = '/wallet-invites'; // Study and Site Coordinator
+        }
+
+        router.push(redirectPath);
+      } else {
+        // Display the specific error message from the API
+        const errorMessage =
+          data.error || 'The Email or password you provided did not match our records. Please try Again.';
+        setErrors({ general: errorMessage });
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      const errorMessage = 'An error occurred during login. Please try again later.';
+      setErrors({ general: errorMessage });
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const renderSortIcon = (column: SortableColumn) => {
-    if (sortColumn !== column) return '⬍';
-    return sortDirection === 'asc' ? '▲' : '▼';
-  };
-
-  const renderColGroup = () => (
-    <colgroup>
-      <col style={{ width: '14%' }} />
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '10%' }} />
-      <col style={{ width: '10%' }} />
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '10%' }} />
-    </colgroup>
-  );
-
- const renderTableHeader = () => (
-  <thead className="bg-gray-50 border-b border-gray-300 sticky top-0 z-10">
-    {/* Controls Row */}
-   <tr>
-  <th colSpan={9} className="px-6 py-4 border-b border-gray-200 bg-gray-100">
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
-
-      {/* Title - Always Left */}
-     <div className="text-left w-full sm:w-auto">
-      <h2 className="font-[IBM Plex Sans] font-normal text-[25px] leading-[30px] tracking-[0px] text-center align-middle capitalize text-gray-800">
-  Wallet Invites
-</h2>
-
+  return (
+    <div 
+      className="flex overflow-hidden shadow-2xl bg-white w-full max-w-[900px] h-fixed h-[400px]"
+      style={{
+        borderRadius: '20px',
+        opacity: 1,
+        aspectRatio: '2 / 1'
+      }}
+    >
+      {/* Left Section (Logo / Branding) */}
+      <div className="w-1/2 bg-[#D31610] text-white flex items-center justify-center overflow-hidden">
+        <img src="/lilly.jpg" alt="Logo" className="w-full h-full object-cover" />
       </div>
 
-      {/* Controls - Right on Desktop, Stacked on Mobile */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4  ">
-<div className="relative w-[328px]">
-  <input
-    type="search"
-    placeholder="Search"
-    value={search}
-    onChange={(e) => setSearch(e.target.value)}
-    className="w-full h-[40px] px-4 font-normal text-sm border border-gray-300 rounded-[30px] focus:outline-none focus:ring-1 focus:ring-gray-400"
-  />
-  <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600" />
-</div>
-
-        <button
-          className="bg-[#0080B2] text-white px-4 py-2 h-9 rounded-full  text-sm flex items-center gap-2"
-          onClick={() => setShowAddModal(true)}
+      {/* Right Section (Login Form) */}
+      <div className="w-1/2 flex flex-col justify-center px-8 sm:px-10 md:px-14">
+        <h2 
+          className="text-[#D52B1E] mb-3"
+          style={{
+            fontFamily: 'IBM Plex Sans',
+            fontWeight: 700,
+            fontStyle: 'normal',
+            fontSize: '30px',
+            lineHeight: '100%',
+            letterSpacing: '0%',
+            textTransform: 'capitalize'
+          }}
         >
-          
-          <span>Add Invite</span>
-          <span className="flex items-center justify-center w-6 h-6 rounded-full border border-white text-lg text-white">
-  ＋
-</span>
+          Login
+        </h2>
 
+        {/* General Error Message */}
+        {errors.general && (
+          <div className="mb-4 p-1 bg-red-50 border border-red-300 rounded-lg text-red-700 text-sm flex items-start gap-2">
+            <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+            <span>{errors.general}</span>
+          </div>
+        )}
 
-        </button>
-      </div>
+        <form className="space-y-0.5" onSubmit={handleSubmit}>
+          <div className="relative">
+            <img 
+              src="/user.png" 
+              alt="User" 
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 pointer-events-none z-10"
+            />
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={formData.email}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              disabled={isLoading}
+              placeholder="Enter your email"
+              className="w-full pl-10 pr-4 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#D31610] disabled:opacity-50"
+              style={{
+                height: '46px',
+                opacity: 1,
+                borderTopLeftRadius: '8px',
+                borderTopRightRadius: '8px',
+              }}
+            />
+          </div>
 
-    </div>
-  </th>
-</tr>
+          <div className="relative">
+            <img 
+              src="/unlock.png" 
+              alt="Password" 
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 pointer-events-none z-10"
+            />
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={formData.password}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              disabled={isLoading}
+              placeholder="Password"
+              className="w-full pl-10 pr-4 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#D31610] disabled:opacity-50"
+              style={{
+                height: '46px',
+                opacity: 1,
+              }}
+            />
+          </div>
 
-
-    {/* Filters Row */}
-   <tr>
-  <th colSpan={9} className="px-6 py-3 border-b border-gray-300">
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs">
-
-      {/* GROUP + FILTERS stacked on left on mobile */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
-        <span className="font-semibold">GROUP</span>
-        <select
-          value={groupBy || ''}
-          onChange={(e) => setGroupBy(e.target.value as GroupByOption)}
-          className="px-2 py-1 w-28 h-9 bg-gray-100 font-normal rounded-md border"
-        >
-          <option value="">Select</option>
-          <option value="trial">Trial</option>
-          <option value="country">Country</option>
-          <option value="language">Language</option>
-        </select>
-
-          {/* Divider between filters and date */}
-          <div className="h-9 w-px bg-gray-300 mx-2"></div>
-        <span className="font-semibold">FILTER</span>
-        {['trial', 'country', 'language', 'status'].map((key, index) => (
-          <select
-            key={key}
-            value={filters[key] || ''}
-            onChange={(e) => handleFilterChange(key, e.target.value)}
-            className="px-2 py-1 w-30 h-9 bg-gray-100 font-normal rounded-md border"
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-[#D31610] text-white font-semibold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              height: '46px',
+              opacity: 1,
+              borderBottomRightRadius: '8px',
+              borderBottomLeftRadius: '8px',
+              borderTopLeftRadius: '0px',
+              borderTopRightRadius: '0px'
+            }}
           >
-            <option value="">
-              {key === 'trial'
-                ? 'Clinical Trial'
-                : key === 'country'
-                ? 'Country/Region'
-                : key.charAt(0).toUpperCase() + key.slice(1)}
-            </option>
-            {[...new Set(data.map((row) => (row as any)[key]).filter(Boolean))].map((val) => (
-              <option key={val} value={val}>
-                {val}
-              </option>
-            ))}
-          </select>
-        ))}
+            {isLoading ? (
+              <span className="flex items-center justify-center">
+                <svg
+                  className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                Signing in...
+              </span>
+            ) : (
+              'Login'
+            )}
+          </button>
+        </form>
 
-        {/* Divider between filters and date */}
-        <div className="h-9 w-px bg-gray-300 mx-2"></div>
-
-        {/* DATE Pickers */}
-        <div className="flex items-center gap-2">
-         
-          <div className="flex items-center bg-white border border-gray-300 rounded-lg h-9">
-            {/* From Date */}
-            <div className="relative flex items-center px-2 hover:bg-gray-50 rounded-l-lg">
-              <DatePicker
-                ref={startDateRef}
-                selected={tempStartDate}
-                onChange={(date: Date | null) => setTempStartDate(date)}
-                placeholderText="From"
-                className="w-16 text-xs text-gray-500 font-normal placeholder-gray-500 bg-transparent cursor-pointer"
-                dateFormat="dd/MM/yyyy"
-                wrapperClassName="date-picker-wrapper"
-                popperClassName="date-picker-high-z-index"
-                popperPlacement="bottom"
-                portalId="root-portal"
-              />
-              <Calendar 
-                className="h-3 w-3 text-gray-500 ml-1 h-full cursor-pointer" 
-                onClick={() => startDateRef.current?.setFocus()}
-              />
-            </div>
-            
-            {/* Divider */}
-            <div className="h-5 w-px bg-gray-300"></div>
-            
-            {/* To Date */}
-            <div className="relative flex items-center px-2 hover:bg-gray-50">
-              <DatePicker
-                ref={endDateRef}
-                selected={tempEndDate}
-                onChange={(date: Date | null) => setTempEndDate(date)}
-                placeholderText="To"
-                className="w-16 text-xs text-gray-500 font-normal placeholder-gray-500 bg-transparent cursor-pointer"
-                dateFormat="dd/MM/yyyy"
-                wrapperClassName="date-picker-wrapper"
-                popperClassName="date-picker-high-z-index"
-                popperPlacement="bottom"
-                portalId="root-portal"
-              />
-              <Calendar 
-                className="h-3 w-3 text-gray-500 ml-1 cursor-pointer" 
-                onClick={() => endDateRef.current?.setFocus()}
-              />
-            </div>
-            
-            {/* Apply Button - Integrated */}
-            <button 
-              className="bg-gray-400 hover:bg-gray-600 text-white px-2 h-full transition-colors flex items-center justify-center rounded-r-lg"
-              onClick={applyDateFilter}
-            >
-              <ArrowRight className="h-3 w-3" />
-            </button>
-          </div>
-
-          {/* CLEAR FILTERS BUTTON */}
-          {(Object.keys(filters).length > 0 || groupBy || search || startDate || endDate) && (
-            <button
-              onClick={clearFilters}
-              className="text-gray-400 rounded-full hover:text-gray-600 bg-gray-200 p-2"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          )}
+        <div className="mt-3">
+          <a 
+            href="/ForgotPassword" 
+            className="text-blue-600 hover:underline"
+            style={{
+              fontFamily: 'Red Hat Text',
+              fontWeight: 400,
+              fontStyle: 'normal',
+              fontSize: '14px',
+              lineHeight: '20px',
+              letterSpacing: '0px'
+            }}
+          >
+            Forgot Password
+          </a>
         </div>
+
+        <p className="text-xs text-gray-500 pt-14">
+          For help logging in or accessing the portal, please contact{' '}
+          <span className="font-semibold">Lilly Support</span>.
+        </p>
       </div>
     </div>
-  </th>
-</tr>
-
-
-    {/* Column Headers Row */}
-    
-  </thead>
-);
-
-
-  const renderTableRows = (rows: typeof filteredData) =>
-    rows.length === 0 ? (
-      <tr className="bg-white  ">
-         <td colSpan={11} className="text-center py-20 text-gray-500">
-          No invites found.
-        </td>
-      </tr>
-    ) : (
-      rows.map((row) => (
-        <tr key={row.id} className="border-b bg-white hover:bg-gray-50  text-xs">
-         
-        <td className="px-3 py-2 max-w-[150px]">
-  <div className=" overflow-auto whitespace-nowrap">
-    {row.trial}
-  </div>
-</td>
-
-          <td className="px-2 py-2 pl-3">{row.language}</td>
-          <td className="px-3 py-2 pl-3">{row.mobile}</td>
-           <td className="px-3 py-2 pl-3">{row.country}</td>
-                 
-          <td className="px-2 py-2 pl-6 ">{row.cardId}</td>
-          <td className="px-3 py-2 pl-2">{row.requestId}</td>
-          <td className="px-3 py-2 pl-2 whitespace-nowrap">
-            {row.sentDate
-              ? new Date(row.sentDate).toLocaleString('en-GB', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              : '-'}
-          </td>
-          <td className="px-3 py-2 pl-2">
-            <StatusBadge status={row.status} />
-          </td>
-          <td className="px-3 py-2 pl-2">
-            <ResendButton status={row.status} onResend={() => onResend(row.id)} />
-          </td>
-        </tr>
-      ))
-    );
-
-  return (
-  <div className=" mt-4 px-3 sm:px-6 md:px-10 py-4">
-
-      {/* Table (Flat or Grouped) */}
-    {!groupBy ? (
-      <div className="mb-4 border rounded-2xl overflow-hidden shadow-sm">
-        <div className="max-w-[1200px] max-h-[591px]">
-          {/* Header table (no scroll) */}
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-base border-collapse table-auto sm:table-fixed">
-              {renderColGroup()}
-              {renderTableHeader()}
-            </table>
-          </div>
-          {/* Scrollable body table */}
-         <div className="max-h-[150px] md:max-h-[230px] overflow-y-auto overflow-x-auto">
-
-            <table className="w-full min-w-[900px] text-base border-collapse table-auto sm:table-fixed">
-  {renderColGroup()}
-<thead className="bg-gray-50 text-sm text-black  ">
-    <tr>
-     {[
-  { label: 'Clinical trial', key: 'trial' },
-  { label: 'Language', key: 'language' },
-  { label: 'Mobile', key: 'mobile' },
-  { label: 'Country/Region', key: 'country' },
-  { label: 'Card ID', key: 'cardId' },
-  { label: 'Request ID', key: 'requestId' },
-  { label: 'Sent date', key: 'sentDate' },
-  { label: 'Status', key: 'status' },
-].map(({ label, key }) => {
-  const reducedPaddingKeys = ['country', 'cardId', 'requestId', 'status','sentDate'];
-  const paddingClass = reducedPaddingKeys.includes(key) ? 'px-1' : 'px-3';
- const extraSpaceClass = key === 'cardId' ? 'pl-5' : '';
-  return (
-   <th
-  key={key}
-  className={`${paddingClass} ${extraSpaceClass} py-2 cursor-pointer text-left text-sm font-sans bg-gray-100 font-bold`}
-  onClick={() => handleSort(key as SortableColumn)}
->
-  <div className="flex  items-center gap-1">
-    <span className="font-semibold">{label}</span>
-    <span>{renderSortIcon(key as SortableColumn)}</span>
-  </div>
-</th>
-
   );
-})}
-
-      <th className="px-2 py-2 w-20 bg-gray-100  overflow-x-auto"></th>
-    </tr>
-  </thead>
-  <tbody>{renderTableRows(filteredData)}</tbody>
-</table>
-
-          </div>
-        </div>
-      </div>
-    ) : (
-      // ✅ grouped table view
-      <div className="mb-4 border rounded-2xl overflow-hidden shadow-sm">
-        {/* Header table (no scroll) */}
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-base border-collapse table-auto sm:table-fixed">
-            {renderColGroup()}
-            {renderTableHeader()}
-          </table>
-        </div>
-        {/* Scrollable grouped body table */}
-        <div className="max-h-[400px] overflow-y-auto overflow-x-auto">
-          <table className="w-full min-w-[900px] text-base border-collapse table-auto sm:table-fixed">
-            {renderColGroup()}
-            <tbody>
-              {Object.entries(groupedData ?? {}).map(([group, rows]) => (
-                <React.Fragment key={group}>
-                  <tr className="bg-gray-100">
-                    <td colSpan={9} className="px-4 py-3">
-                      <button
-                        onClick={() => toggleGroup(group)}
-                        className="w-full flex rounded-2xl justify-between items-center bg-gray-200 px-4 py-3 text-left font-medium text-gray-700 hover:bg-gray-200"
-                      >
-                        <span>
-                          {groupBy?.charAt(0).toUpperCase() + groupBy?.slice(1)}: {group} ({rows.length})
-                        </span>
-                        <span>{expandedGroups[group] ? '−' : '+'}</span>
-                      </button>
-                    </td>
-                  </tr>
-
-                  {expandedGroups[group] && (
-                    <>
-                      {/* Table headers per group */}
-                      <tr className="bg-gray-50 text-gray-700 font-semibold text-xs">
-                        <td className="px-3 py-2">Clinical trial</td>
-                        <td className="px-3 py-2">Language</td>
-                        <td className="px-3 py-2">Mobile</td>
-                        <td className="px-3 py-2">Country</td>
-                        <td className="px-3 py-2">Card ID</td>
-                        <td className="px-3 py-2">Request ID</td>
-                        <td className="px-3 py-2">Sent date</td>
-                   
-                  
-                        <td className="px-3 py-2 hidden sm:table-cell">Status</td>
-                        <td className="px-3 py-2 hidden sm:table-cell"></td>
-                      </tr>
-
-                      {/* Table rows */}
-                      {rows.map((row) => (
-                        <tr key={row.id} className="border-b bg-white hover:bg-gray-50 text-xs">
-                          <td className="px-3 py-2 max-w-[150px] whitespace-nowrap overflow-auto">{row.trial}
-                            {/* Mobile-only actions */}
-                            <div className="sm:hidden mt-1 flex items-center gap-2">
-                              <ResendButton status={row.status} onResend={() => onResend(row.id)} />
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 pl-3">{row.language}</td>
-                          <td className="px-3 py-2 pl-3">{row.mobile}</td>
-                          <td className="px-3 py-2 pl-3">{row.country}</td>
-                          <td className="px-3 py-2 pl-2">{row.cardId}</td>
-                          <td className="px-3 py-2 pl-2">{row.requestId}</td>
-                          <td className="px-3 py-2 pl-2">
-                            {row.sentDate
-                              ? new Date(row.sentDate).toLocaleString('en-GB', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
-                              : '-'}
-                          </td>
-                          <td className="px-3 py-2 hidden sm:table-cell">
-                            <StatusBadge status={row.status} />
-                          </td>
-                          <td className="px-3 py-2">
-                            <ResendButton status={row.status} onResend={() => onResend(row.id)} />
-                          </td>
-                        </tr>
-                      ))}
-                    </>
-                  )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    )}
-
-      
-
-      <AddInviteModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} />
-    </div>
-  );
-};
-
-export default WalletInvitesTable;
+}
