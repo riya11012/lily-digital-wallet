@@ -1,3 +1,253 @@
+jb
+using Microsoft.Crm.Sdk.Messages;
+using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
+using Microsoft.Xrm.Tooling.Connector;
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Threading;
+
+namespace UtilityCaptureEntityLocations
+{
+    internal class Program
+    {
+        static void Main(string[] args)
+        {
+            try
+            {
+                // NOTE: Only org URL, not record URL
+                string url = "https://crmprodapp.triplefin.com/ProdRx365CRM/";
+                string userName = @"ajay.ghosalkar";
+                string password = "AG01052026!";
+
+                string conn = $@"
+                    Url={url};
+                    AuthType=AD;
+                    Domain=TRIFIN;
+                    UserName={userName};
+                    Password={password};
+                ";
+
+                using (var svc = new CrmServiceClient(conn))
+                {
+                    Console.WriteLine("Execution Started...");
+
+                    var response = (WhoAmIResponse)svc.Execute(new WhoAmIRequest());
+                    Console.WriteLine($"Connected to Dynamics successfully. UserId: {response.UserId}");
+
+                    string[] entities = new string[]
+                    {
+                     //"tf_adverseevent"
+                      //  "tf_facility",
+                        // "tf_siteofservice",
+                        // "tf_prescription",
+                         //"tf_generalinquiry",
+                        // "account",
+                        //"contact",
+                        // "tf_patientproductenrollment",
+                        // "tf_productonprogram",
+                        // "tf_productqualitycomplaint",
+// "tf_providerproductenrollment",
+                        "incident"
+                    };
+
+                    Program program = new Program();
+                    program.CaptureLocationsInParallel(entities, svc);
+
+                    Console.WriteLine("Execution Completed.");
+                    Console.ReadLine();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"FATAL ERROR: {ex.Message}");
+            }
+        }
+
+        // ================================
+        // PROCESS ENTITIES SEQUENTIALLY
+        // ================================
+        public void CaptureLocationsInParallel(string[] entities, IOrganizationService service)
+        {
+            foreach (var entity in entities)
+            {
+                try
+                {
+                    CaptureLocationForEntity(entity, service);
+                }
+                catch (Exception ex)
+                {
+                    LogError(entity, ex);
+                    Console.WriteLine($"ERROR for {entity}: {ex.Message}");
+                }
+            }
+        }
+
+        // ================================
+        // CAPTURE LOCATION FOR ONE ENTITY
+        // ================================
+        public void CaptureLocationForEntity(string sEntity, IOrganizationService service)
+        {
+            //string outputFolder = @"C:\Ajay\JJPAF\SharepointDocumentLocation\";
+            string outputFolder = @"C:\Ajay\CRMCore\SharepointDocumentLocation\";
+            Directory.CreateDirectory(outputFolder);
+
+            string logFolder = Path.Combine(outputFolder, "Logs");
+            Directory.CreateDirectory(logFolder);
+
+            string csvFilePath = Path.Combine(outputFolder, $"{sEntity}.csv");
+            string resumeFilePath = Path.Combine(outputFolder, $"{sEntity}_resume.txt");
+            string logFilePath = Path.Combine(logFolder, $"{sEntity}_{DateTime.Now:yyyyMMdd_HHmm}.log");
+
+            int pageSize = 2000;
+            int maxRetries = 3;
+
+            try
+            {
+                int sNo = 1;
+                int pageNumber = 1;
+                string pagingCookie = null;
+
+                if (File.Exists(resumeFilePath))
+                {
+                    string[] lines = File.ReadAllLines(resumeFilePath);
+                    if (lines.Length >= 2)
+                    {
+                        int.TryParse(lines[0], out pageNumber);
+                        int.TryParse(lines[1], out sNo);
+                    }
+                }
+
+                using (var writer = new StreamWriter(csvFilePath, append: true))
+                using (var logWriter = new StreamWriter(logFilePath, append: true))
+                {
+                    if (sNo == 1)
+                        writer.WriteLine("SNo,Name,Entity,RelativeURL,ParentSiteLocation");
+
+                    Stopwatch sw = new Stopwatch();
+                    sw.Start();
+
+                    bool moreRecords = true;
+
+                    while (moreRecords)
+                    {
+                        bool success = false;
+                        int attempt = 0;
+
+                        while (!success && attempt < maxRetries)
+                        {
+                            try
+                            {
+                                string fetch = BuildFetchXml(sEntity, pageNumber, pageSize, pagingCookie);
+                                EntityCollection result = service.RetrieveMultiple(new FetchExpression(fetch));
+
+                                foreach (var entityRow in result.Entities)
+                                {
+                                    string name = entityRow.GetAttributeValue<string>("name") ?? "";
+                                    string relativeUrl = entityRow.GetAttributeValue<string>("relativeurl") ?? "";
+
+                                    string parentSite = "";
+                                    if (entityRow.Contains("parentsiteorlocation"))
+                                    {
+                                        var parentRef = entityRow.GetAttributeValue<EntityReference>("parentsiteorlocation");
+                                        if (parentRef != null)
+                                            parentSite = parentRef.Name ?? "";
+                                    }
+
+                                    writer.WriteLine($"{sNo},\"{name}\",{sEntity},\"{relativeUrl}\",\"{parentSite}\"");
+                                    sNo++;
+
+                                    // Show progress
+                                    if (sNo % 100 == 0)
+                                    {
+                                        double elapsedSec = sw.Elapsed.TotalSeconds;
+                                        double rate = sNo / elapsedSec;
+                                        double etaSec = (moreRecords && rate > 0) ? ((pageSize * 1000 - sNo) / rate) : 0;
+                                        Console.Write($"\r{sEntity}: {sNo} records processed | ETA: {TimeSpan.FromSeconds(etaSec):hh\\:mm\\:ss}");
+                                    }
+                                }
+
+                                // Save resume
+                                File.WriteAllLines(resumeFilePath, new string[] { pageNumber.ToString(), sNo.ToString() });
+
+                                moreRecords = result.MoreRecords;
+                                pagingCookie = result.PagingCookie;
+                                pageNumber++;
+
+                                success = true;
+                            }
+                            catch (Exception ex)
+                            {
+                                attempt++;
+                                logWriter.WriteLine($"{DateTime.Now}: Retry {attempt}/{maxRetries} for page {pageNumber} due to error: {ex.Message}");
+                                Thread.Sleep(5000 * attempt);
+
+                                if (attempt >= maxRetries)
+                                    throw new Exception($"Page {pageNumber} failed after {maxRetries} retries", ex);
+                            }
+                        }
+                    }
+
+                    sw.Stop();
+                    logWriter.WriteLine($"{DateTime.Now}: Completed entity {sEntity} → {sNo - 1} records exported.");
+
+                    if (File.Exists(resumeFilePath))
+                        File.Delete(resumeFilePath);
+                }
+
+                Console.WriteLine($"\nCompleted entity: {sEntity} → CSV Exported Successfully.");
+            }
+            catch (Exception ex)
+            {
+                LogError(sEntity, ex);
+                Console.WriteLine($"\nERROR for entity {sEntity}: {ex.Message}");
+            }
+        }
+
+        // ================================
+        // BUILD FETCHXML
+        // ================================
+        private string BuildFetchXml(string entityName, int page, int pageSize, string cookie)
+        {
+            string cookiePart = string.IsNullOrEmpty(cookie) ? "" : $"<paging-cookie>{System.Security.SecurityElement.Escape(cookie)}</paging-cookie>";
+
+            return $@"
+<fetch version='1.0' no-lock='true' count='{pageSize}' page='{page}'>
+  <entity name='sharepointdocumentlocation'>
+    <attribute name='name'/>
+    <attribute name='parentsiteorlocation'/>
+    <attribute name='relativeurl'/>
+    <attribute name='regardingobjectid'/>
+    <link-entity name='{entityName}' from='{entityName}id' to='regardingobjectid' link-type='inner'/>
+  </entity>
+  {cookiePart}
+</fetch>";
+        }
+
+        // ================================
+        // ERROR LOGGING
+        // ================================
+        private void LogError(string entityName, Exception ex)
+        {
+            try
+            {
+                string logFolder = @"C:\Ajay\JJPAF\SharepointDocumentLocation\Logs";
+                Directory.CreateDirectory(logFolder);
+                string logFilePath = Path.Combine(logFolder, $"{entityName}_ERROR.log");
+
+                using (var logWriter = new StreamWriter(logFilePath, append: true))
+                {
+                    logWriter.WriteLine($"{DateTime.Now}: {ex.Message}");
+                    logWriter.WriteLine(ex.StackTrace);
+                    logWriter.WriteLine("------------------------------------------------");
+                }
+            }
+            catch { }
+        }
+    }
+}
+
 // Program.cs
 using System;
 using System.Data;
