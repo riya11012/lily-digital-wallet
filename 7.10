@@ -1,255 +1,893 @@
-'use client'
+//using System;
+//using System.Collections.Concurrent;
+//using System.Collections.Generic;
+//using System.Data;
+//using System.Diagnostics;
+//using System.IO;
+//using System.Linq;
+//using System.Net;
+//using System.Text;
+//using System.Threading;
+//using System.Threading.Tasks;
+//using Microsoft.SharePoint.Client;
+//using Microsoft.VisualBasic.FileIO;
 
-import { useState, useEffect } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
+//// Aliases to avoid ambiguity
+//using IOFile = System.IO.File;
+//using SPFile = Microsoft.SharePoint.Client.File;
 
-export default function ProfilePage() {
-  const { user, updateProfile } = useAuth()
+//namespace SharePointBatchDownloader_CSVSplit
+//{
+//    // ---- Models ----
+//    public class FileResult
+//    {
+//        public int SrNo { get; set; }
+//        public string Entity { get; set; }
+//        public string FileName { get; set; }
+//        public long SizeBytes { get; set; }
+//        public double SizeKB { get; set; }
+//        public string SharepointDocumentURL { get; set; }
+//    }
 
-  // Prevent page scrolling
-  useEffect(() => {
-    document.documentElement.style.overflow = 'hidden';
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.documentElement.style.overflow = '';
-      document.body.style.overflow = '';
-    };
-  }, []);
+//    public class MissingResult
+//    {
+//        public string Entity { get; set; }
+//        public string FolderUrl { get; set; }
+//        public string ErrorMessage { get; set; }
+//    }
+
+//    // ---- SharePoint Helper (creates ClientContext per call) ----
+//    public class SharePointHelperOptimized
+//    {
+//        private readonly string _siteUrl;
+//        private readonly ICredentials _creds;
+
+//        public SharePointHelperOptimized(string siteUrl, ICredentials creds)
+//        {
+//            _siteUrl = siteUrl ?? throw new ArgumentNullException(nameof(siteUrl));
+//            _creds = creds ?? throw new ArgumentNullException(nameof(creds));
+//        }
+
+//        public Task<IEnumerable<FileResult>> GetFilesForFolderAsync(string entity, string relativeUrl, CancellationToken ct)
+//        {
+//            return Task.Run(() =>
+//            {
+//                var results = new List<FileResult>();
+//                // build server relative url like "/Entity/relative/path"
+//                string folderRelativeUrl;
+
+//                // If relativePath already starts with '/', it is a full server-relative URL
+//                if (!string.IsNullOrWhiteSpace(relativeUrl) && relativeUrl.StartsWith("/"))
+//                {
+//                    folderRelativeUrl = relativeUrl.TrimEnd('/');
+//                }
+//                else
+//                {
+//                    folderRelativeUrl =
+//                        "/" + (entity ?? string.Empty).Trim('/') + "/" +
+//                        (relativeUrl ?? string.Empty).Trim('/');
 
 
-  const [currentPassword, setCurrentPassword] = useState<string>('')
-  const [newPassword, setNewPassword] = useState<string>('')
-  const [retypePassword, setRetypePassword] = useState<string>('')
+//                }
+//                Console.WriteLine(
+//                    $"Entity: {entity} | FolderUrl: {folderRelativeUrl} | Status: COMPLETED");
 
-  const [showCurrent, setShowCurrent] = useState<boolean>(false)
-  const [showNew, setShowNew] = useState<boolean>(false)
-  const [showRetype, setShowRetype] = useState<boolean>(false)
+//                Logger.Log(entity,
+//                    $"Entity: {entity} | FolderUrl: {folderRelativeUrl} | Status: COMPLETED");
 
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [submitting, setSubmitting] = useState<boolean>(false)
-  const [success, setSuccess] = useState<string>('')
-  const [failure, setFailure] = useState<string>('')
+//                try
+//                {
+//                    using (var ctx = new ClientContext(_siteUrl))
+//                    {
+//                        ctx.Credentials = _creds;
 
-  const validatePassword = (password: string) => {
-    const minLength = password.length >= 8
-    const hasLetter = /[a-zA-Z]/.test(password)
-    const hasNumber = /\d/.test(password)
-    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password)
-    return minLength && hasLetter && hasNumber && hasSpecial
-  }
+//                        var folder = ctx.Web.GetFolderByServerRelativeUrl(folderRelativeUrl);
+//                        ctx.Load(folder.Files, fs => fs.Include(f => f.Name, f => f.Length, f => f.ServerRelativeUrl));
+//                        ctx.ExecuteQuery();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSuccess('')
-    setFailure('')
-    setErrors({})
+//                        int sr = 1;
+//                        foreach (SPFile file in folder.Files)
+//                        {
+//                            results.Add(new FileResult
+//                            {
+//                                SrNo = sr++,
+//                                Entity = entity,
+//                                FileName = file.Name,
+//                                SizeBytes = file.Length,
+//                                SizeKB = Math.Round(file.Length / 1024.0, 2),
+//                                SharepointDocumentURL = _siteUrl.TrimEnd('/') + folderRelativeUrl
+//                            });
+//                        }
+//                    }
+//                }
+//                catch (Exception ex)
+//                {
+//                    string errorLine =
+//                        $"Entity: {entity} | FolderUrl: {folderRelativeUrl} | Status: ERROR | ErrorMessage: {ex.Message}";
 
-    const newErrors: Record<string, string> = {}
+//                    Console.WriteLine(errorLine);
+//                    Logger.Log(entity, errorLine);
 
-    // Show errors for all password fields
-    if (!currentPassword) {
-      newErrors.currentPassword = 'Please enter your current password'
+//                    Program.MissingItems.Add(new MissingResult
+//                    {
+//                        Entity = entity,
+//                        FolderUrl = folderRelativeUrl,
+//                        ErrorMessage = ex.Message
+//                    });
+//                }
+
+
+//                return (IEnumerable<FileResult>)results;
+//            }, ct);
+//        }
+//    }
+
+//    // ---- CSV Reader ----
+//    public static class CSVReader
+//    {
+//        public static DataTable ReadCSV(string path)
+//        {
+//            var dt = new DataTable();
+
+//            using (var parser = new TextFieldParser(path))
+//            {
+//                parser.TextFieldType = Microsoft.VisualBasic.FileIO.FieldType.Delimited;
+//                parser.SetDelimiters(",");
+//                parser.HasFieldsEnclosedInQuotes = true;
+
+//                string[] headers = parser.ReadFields();
+//                foreach (var h in headers) dt.Columns.Add(h);
+
+//                while (!parser.EndOfData)
+//                {
+//                    var fields = parser.ReadFields();
+//                    dt.Rows.Add(fields);
+//                }
+//            }
+
+//            return dt;
+//        }
+//    }
+
+//    // ---- Logger ----
+//    public static class Logger
+//    {
+//        private static readonly object _fileLock = new object();
+//        private static string _logDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+
+//        public static void EnsureLogDirectory() => Directory.CreateDirectory(_logDirectory);
+
+//        public static void Log(string entity, string message)
+//        {
+//            try
+//            {
+//                EnsureLogDirectory();
+//                string safeEntity = MakeSafeFilename(entity ?? "unknown");
+//                string file = Path.Combine(_logDirectory, $"{safeEntity}_{DateTime.UtcNow:yyyy-MM-dd}.log");
+
+//                string line = $"[{DateTime.UtcNow:O}] {message}{Environment.NewLine}";
+
+//                lock (_fileLock)
+//                {
+//                    IOFile.AppendAllText(file, line);
+//                }
+//            }
+//            catch { }
+//        }
+
+//        private static string MakeSafeFilename(string input)
+//        {
+//            foreach (var c in Path.GetInvalidFileNameChars())
+//                input = input.Replace(c, '_');
+//            return input;
+//        }
+//    }
+
+//    // ---- Process Controller (callback chunking) ----
+//    public class ProcessControllerOptimized
+//    {
+//        private readonly DataTable _folders;
+//        private readonly int _maxParallel;
+//        private readonly SharePointHelperOptimized _helper;
+
+//        private int _processedCount = 0;
+//        private readonly int _totalCount;
+//        private readonly object _consoleLock = new object();
+//        private readonly Stopwatch _stopwatch;
+//        private readonly int _batchSize;
+//        private double _smoothedSecondsPerItem = 0.0;
+//        private readonly double _smoothingAlpha = 0.15;
+
+//        public ProcessControllerOptimized(DataTable dt, int maxParallel, SharePointHelperOptimized helper, int batchSize = 100)
+//        {
+//            _folders = dt ?? throw new ArgumentNullException(nameof(dt));
+//            _maxParallel = maxParallel;
+//            _helper = helper ?? throw new ArgumentNullException(nameof(helper));
+//            _totalCount = dt.Rows.Count;
+//            _stopwatch = Stopwatch.StartNew();
+//            _batchSize = batchSize;
+//        }
+
+//        /// <summary>
+//        /// Processes folders in batches and invokes onChunkReady callback each time accumulated results >= chunkSize.
+//        /// Works on .NET Framework (no IAsyncEnumerable).
+//        /// </summary>
+//        public async Task StartInChunksAsync(
+//            CancellationToken ct,
+//            int chunkSize,
+//            Action<List<FileResult>, int> onChunkReady)
+//        {
+//            if (onChunkReady == null) throw new ArgumentNullException(nameof(onChunkReady));
+//            if (chunkSize <= 0) throw new ArgumentOutOfRangeException(nameof(chunkSize));
+
+//            var results = new List<FileResult>();
+//            int chunkNumber = 1;
+//            int updateFrequency = Math.Max(1, _totalCount / 1000); // ~0.1% updates
+
+//            for (int i = 0; i < _totalCount; i += _batchSize)
+//            {
+//                ct.ThrowIfCancellationRequested();
+
+//                var batchRows = _folders.AsEnumerable().Skip(i).Take(_batchSize).ToList();
+//                var batchResults = new ConcurrentBag<FileResult>();
+//                var throttler = new SemaphoreSlim(_maxParallel);
+
+//                var tasks = batchRows.Select(async row =>
+//                {
+//                    await throttler.WaitAsync(ct);
+//                    try
+//                    {
+//                        // Adjust indices if your CSV layout differs
+//                        string entity = null;
+//                        string relativePath = null;
+
+//                        // Use row.Table — table variable is NOT in scope here
+//                        var columns = row.Table.Columns;
+
+//                        // Adjust column names to match your CSV exactly
+//                        if (columns.Contains("Entity"))
+//                            entity = row["Entity"]?.ToString();
+
+//                        if (columns.Contains("RelativeURL"))
+//                            relativePath = row["RelativeURL"]?.ToString();
+//                        else if (columns.Contains("FolderUrl"))
+//                            relativePath = row["FolderUrl"]?.ToString();
+
+//                        // Safety check — skip bad rows instead of crashing
+//                        if (string.IsNullOrWhiteSpace(entity) || string.IsNullOrWhiteSpace(relativePath))
+//                        {
+//                            Logger.Log("controller",
+//                                $"Skipping row due to missing data. Columns: {string.Join(",", columns.Cast<DataColumn>().Select(c => c.ColumnName))}");
+//                            return;
+//                        }
+
+
+//                        var files = await _helper.GetFilesForFolderAsync(entity, relativePath, ct);
+//                        foreach (var f in files) batchResults.Add(f);
+
+//                        int done = Interlocked.Increment(ref _processedCount);
+//                        UpdateSmoothedRate(done);
+
+//                        if (done % updateFrequency == 0 || done == _totalCount)
+//                            PrintProgress(done, _totalCount);
+//                    }
+//                    finally
+//                    {
+//                        throttler.Release();
+//                    }
+//                }).ToList();
+
+//                await Task.WhenAll(tasks);
+
+//                // merge batch results into accumulating list
+//                if (!batchResults.IsEmpty)
+//                {
+//                    lock (results)
+//                    {
+//                        results.AddRange(batchResults);
+//                    }
+//                }
+
+//                // emit as many full chunks as we have
+//                while (results.Count >= chunkSize)
+//                {
+//                    var emitChunk = results.Take(chunkSize).ToList();
+//                    results.RemoveRange(0, chunkSize);
+
+//                    onChunkReady(emitChunk, chunkNumber);
+//                    chunkNumber++;
+//                }
+//            }
+
+//            // emit remainder if any
+//            if (results.Count > 0)
+//            {
+//                onChunkReady(results, chunkNumber);
+//            }
+
+//            Console.WriteLine();
+//        }
+
+//        private void UpdateSmoothedRate(int done)
+//        {
+//            double elapsedSeconds = Math.Max(1.0, _stopwatch.Elapsed.TotalSeconds);
+//            double currentSecondsPerItem = elapsedSeconds / done;
+//            if (_smoothedSecondsPerItem == 0.0) _smoothedSecondsPerItem = currentSecondsPerItem;
+//            else _smoothedSecondsPerItem = _smoothingAlpha * currentSecondsPerItem + (1 - _smoothingAlpha) * _smoothedSecondsPerItem;
+//        }
+
+//        private void PrintProgress(int done, int total)
+//        {
+//            double percent = total == 0 ? 1.0 : (double)done / total;
+//            int barLength = 40;
+//            int filled = (int)(percent * barLength);
+//            string bar = "[" + new string('█', filled) + new string('░', barLength - filled) + "]";
+
+//            double secondsPerItem = _smoothedSecondsPerItem > 0 ? _smoothedSecondsPerItem : (_stopwatch.Elapsed.TotalSeconds / Math.Max(1, done));
+//            TimeSpan eta = TimeSpan.FromSeconds(Math.Max(0, total - done) * secondsPerItem);
+//            double foldersPerSec = secondsPerItem > 0 ? 1.0 / secondsPerItem : 0.0;
+
+//            ConsoleColor barColor = percent < 0.33 ? ConsoleColor.Red : percent < 0.66 ? ConsoleColor.Yellow : ConsoleColor.Green;
+
+//            lock (_consoleLock)
+//            {
+//                Console.Write("\r ");
+//                var prev = Console.ForegroundColor;
+//                Console.ForegroundColor = barColor;
+//                Console.Write(bar);
+//                Console.ForegroundColor = prev;
+//                Console.Write($" {percent * 100:0.0}% ({done}/{total}) | Speed: {foldersPerSec:0.00} f/s | Elapsed: {_stopwatch.Elapsed:hh\\:mm\\:ss} | ETA: {eta:hh\\:mm\\:ss}   ");
+//            }
+//        }
+//    }
+
+//    // ---- Program ----
+//    public class Program
+//    {
+//        public static ConcurrentBag<MissingResult> MissingItems = new ConcurrentBag<MissingResult>();
+
+//        // per-entity locks for assigning SrNo and preventing races
+//        private static readonly ConcurrentDictionary<string, object> PerEntityLocks = new ConcurrentDictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+//        static async Task Main(string[] args)
+//        {
+//            try
+//            {
+//                DateTime processStart = DateTime.Now;
+
+//                Console.Write("Enter the entity name (or the CSV filename without extension): ");
+//                string entityArg = Console.ReadLine()?.Trim();
+//                if (string.IsNullOrEmpty(entityArg))
+//                {
+//                    Console.WriteLine("Entity required. Exiting.");
+//                    return;
+//                }
+
+//                Console.WriteLine("Entity/Input identifier: " + entityArg);
+//                Console.WriteLine($"Process started at: {processStart:yyyy-MM-dd HH:mm:ss}");
+//                Logger.Log("controller", $"Process started at: {processStart:yyyy-MM-dd HH:mm:ss}");
+
+//                string siteUrl = "https://spcrm.triplefin.com/"; // change if needed
+//               // string csvPath = Path.Combine(@"C:\Ajay\CRMCore\SharepointDocumentPropertyDetails\Patient Product Enrollment - Properties Stat\", entityArg + ".csv");
+//                string csvPath = Path.Combine(@"C:\Ajay\CRMCore\SharepointDocumentLocation\", entityArg + ".csv");
+
+//                if (!IOFile.Exists(csvPath))
+//                {
+//                    Console.WriteLine($"CSV not found: {csvPath}");
+//                    return;
+//                }
+
+//                var creds = BuildCredentials();
+//                var helper = new SharePointHelperOptimized(siteUrl, creds);
+//                var table = CSVReader.ReadCSV(csvPath);
+
+//                var controller = new ProcessControllerOptimized(table, maxParallel: 50, helper, batchSize: 100);
+
+//                using var cts = new CancellationTokenSource();
+
+//                // trackers for parts and SrNo per entity
+//                var entityPartCounter = new ConcurrentDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+//                var entitySrCounter = new ConcurrentDictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+//                int emittedChunk = 0;
+//                var swTotal = Stopwatch.StartNew();
+
+//                try
+//                {
+//                    // chunkSize 200,000 as requested
+//                    int chunkSize = 200000;
+
+//                    await controller.StartInChunksAsync(cts.Token, chunkSize, (chunk, chunkNumber) =>
+//                    {
+//                        emittedChunk++;
+//                        Console.WriteLine($"\nProcessing emitted chunk #{chunkNumber} with {chunk.Count} rows...");
+
+//                        // group chunk by entity
+//                        var groups = chunk.GroupBy(r => r.Entity ?? "Unknown");
+
+//                        foreach (var grp in groups)
+//                        {
+//                            string rawEntityName = grp.Key ?? "Unknown";
+//                            string entitySafe = MakeSafeFilename(rawEntityName);
+
+//                            // ensure thread-safe part number increment
+//                            int partNo = entityPartCounter.AddOrUpdate(entitySafe, 1, (_, old) => old + 1);
+
+//                            // lock per-entity to assign SrNo sequentially across parts
+//                            var lockObj = PerEntityLocks.GetOrAdd(entitySafe, _ => new object());
+
+//                            List<FileResult> listToWrite;
+//                            long startingSr;
+
+//                            lock (lockObj)
+//                            {
+//                                // get current sr (default 1)
+//                                long current = entitySrCounter.GetOrAdd(entitySafe, 1L);
+
+//                                // build list and assign SrNo sequentially starting from current
+//                                listToWrite = new List<FileResult>();
+//                                foreach (var r in grp.OrderBy(r => r.SrNo))
+//                                {
+//                                    listToWrite.Add(new FileResult
+//                                    {
+//                                        SrNo = (int)current,
+//                                        Entity = r.Entity,
+//                                        FileName = r.FileName,
+//                                        SizeBytes = r.SizeBytes,
+//                                        SizeKB = r.SizeKB,
+//                                        SharepointDocumentURL = r.SharepointDocumentURL
+//                                    });
+//                                    current++;
+//                                }
+
+//                                // persist updated counter
+//                                entitySrCounter[entitySafe] = current;
+//                                startingSr = entitySrCounter[entitySafe] - listToWrite.Count;
+//                            }
+
+//                            // filename with timestamp
+//                            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+//                            string outFileName = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+//                                $"Output_{entitySafe}_Part{partNo}_{timestamp}.csv");
+
+//                            // write CSV (quoted fields, UTF8 BOM)
+//                            try
+//                            {
+//                                WriteCsv(listToWrite, outFileName);
+//                                Console.WriteLine($"Wrote {listToWrite.Count} rows → {outFileName}");
+//                            }
+//                            catch (Exception ex)
+//                            {
+//                                Console.WriteLine($"Error writing CSV for {entitySafe}: {ex.Message}");
+//                                Logger.Log(entitySafe, $"Error writing CSV: {ex}");
+//                            }
+//                        } // foreach group
+
+//                        // free chunk memory
+//                        chunk.Clear();
+//                    });
+//                }
+//                catch (OperationCanceledException)
+//                {
+//                    Console.WriteLine("\nOperation cancelled.");
+//                }
+
+//                swTotal.Stop();
+//                Console.WriteLine($"\nAll chunks processed in {swTotal.Elapsed:hh\\:mm\\:ss}.");
+
+//                // write missing items CSV if any
+//                if (!MissingItems.IsEmpty)
+//                {
+//                    string missingPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+//                        $"MissingFiles_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+//                    WriteMissingCsv(MissingItems.ToList(), missingPath);
+//                    Console.WriteLine("Missing files report: " + missingPath);
+//                }
+//                else
+//                {
+//                    Console.WriteLine("No missing files detected.");
+//                }
+//            }
+//            catch (Exception ex)
+//            {
+//                Console.WriteLine("Fatal error: " + ex);
+//            }
+//            finally
+//            {
+//                Console.WriteLine("Press Enter to exit.");
+//                Console.ReadLine();
+//            }
+//        }
+
+//        // ---- CSV writer helpers ----
+
+//        /// <summary>
+//        /// Writes list of FileResult to CSV. Overwrites existing file.
+//        /// Uses quoted fields and emits UTF8 BOM so Excel opens file correctly.
+//        /// </summary>
+//        private static void WriteCsv(List<FileResult> rows, string path)
+//        {
+//            var dir = Path.GetDirectoryName(path);
+//            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+//            // UTF8 with BOM
+//            var utf8WithBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
+
+//            // ensure single writer per path at a time
+//            var fileLock = PerPathLocks.GetOrAdd(path, _ => new object());
+
+//            lock (fileLock)
+//            {
+//                using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
+//                using (var sw = new StreamWriter(fs, utf8WithBom))
+//                {
+//                    sw.WriteLine("\"SrNo\",\"Entity\",\"FileName\",\"SizeBytes\",\"SizeKB\",\"SharepointDocumentURL\"");
+
+//                    foreach (var r in rows)
+//                    {
+//                        sw.WriteLine($"\"{r.SrNo}\",\"{EscapeForCsv(r.Entity)}\",\"{EscapeForCsv(r.FileName)}\",\"{r.SizeBytes}\",\"{r.SizeKB}\",\"{EscapeForCsv(r.SharepointDocumentURL)}\"");
+//                    }
+//                }
+//            }
+//        }
+
+//        private static readonly ConcurrentDictionary<string, object> PerPathLocks = new ConcurrentDictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+//        private static string EscapeForCsv(string input)
+//        {
+//            if (input == null) return string.Empty;
+//            return input.Replace("\"", "\"\"");
+//        }
+
+//        private static string MakeSafeFilename(string input)
+//        {
+//            if (string.IsNullOrWhiteSpace(input)) return "Unknown";
+//            foreach (var c in Path.GetInvalidFileNameChars())
+//                input = input.Replace(c, '_');
+//            return input;
+//        }
+
+//        private static void WriteMissingCsv(List<MissingResult> data, string path)
+//        {
+//            var dir = Path.GetDirectoryName(path);
+//            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+//            var utf8WithBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
+//            using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
+//            using (var sw = new StreamWriter(fs, utf8WithBom))
+//            {
+//                sw.WriteLine("\"Entity\",\"FolderUrl\",\"ErrorMessage\"");
+//                foreach (var m in data)
+//                {
+//                    sw.WriteLine($"\"{EscapeForCsv(m.Entity)}\",\"{EscapeForCsv(m.FolderUrl)}\",\"{EscapeForCsv(m.ErrorMessage)}\"");
+//                }
+//            }
+//        }
+
+//        private static NetworkCredential BuildCredentials()
+//        {
+//            string user = Environment.GetEnvironmentVariable("SP_USER") ?? "ajay.ghosalkar";
+//            string pass = Environment.GetEnvironmentVariable("SP_PASS") ?? "AG01052026!";
+//            string domain = Environment.GetEnvironmentVariable("SP_DOMAIN") ?? "TRIFIN";
+//            return new NetworkCredential(user, pass, domain);
+//        }
+//    }
+//}
+
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Data;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.SharePoint.Client;
+using Microsoft.VisualBasic.FileIO;
+
+using IOFile = System.IO.File;
+using SPFile = Microsoft.SharePoint.Client.File;
+
+namespace SharePointBatchDownloader_CSVSplit
+{
+    // ===================== MODELS =====================
+    public class FileResult
+    {
+        public int SrNo { get; set; }
+        public string Entity { get; set; }
+        public string FileName { get; set; }
+        public long SizeBytes { get; set; }
+        public double SizeKB { get; set; }
+        public string SharepointDocumentURL { get; set; }
     }
-    if (!newPassword) {
-      newErrors.newPassword = 'Please enter 8+ characters. Include numbers and special characters.'
-    } else if (!validatePassword(newPassword)) {
-      newErrors.newPassword = 'Please enter 8+ characters. Include numbers and special characters.'
-    }
-    if (!retypePassword) {
-      newErrors.retypePassword = 'Password does not match'
-    } else if (newPassword !== retypePassword) {
-      newErrors.retypePassword = 'Password does not match'
+
+    public class MissingResult
+    {
+        public string Entity { get; set; }
+        public string FolderUrl { get; set; }
+        public string ErrorMessage { get; set; }
     }
 
-    if (Object.keys(newErrors).length) {
-      setErrors(newErrors)
-      return
-    }
+    // ===================== SHAREPOINT HELPER =====================
+    public class SharePointHelperOptimized
+    {
+        private readonly string _siteUrl;
+        private readonly ICredentials _creds;
 
-    setSubmitting(true)
-    try {
-      let passwordOk = true
-      if (newPassword && currentPassword) {
-        // Simulate API call for now - replace with actual API when implemented
-        await new Promise(resolve => setTimeout(resolve, 500))
-        passwordOk = true // Simulate success for now
-        
-        // TODO: Implement actual API call
-        // const resp = await fetch('/api/auth/change-password', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({ currentPassword, newPassword }),
-        // })
-        // passwordOk = resp.ok
-        // if (!passwordOk) {
-        //   const data = await resp.json().catch(() => ({}))
-        //   setFailure(data?.error || 'Failed to change password')
-        // }
-      }
+        public SharePointHelperOptimized(string siteUrl, ICredentials creds)
+        {
+            _siteUrl = siteUrl;
+            _creds = creds;
+        }
 
-      if (passwordOk) {
-        setSuccess('Your password has been updated.')
-        setCurrentPassword('')
-        setNewPassword('')
-        setRetypePassword('')
-      }
-    } catch (err) {
-      setFailure('Something went wrong')
-    } finally {
-      setSubmitting(false)
-    }
-  }
+        public Task<List<FileResult>> GetFilesForFolderAsync(
+            string entity, string relativeUrl, CancellationToken ct)
+        {
+            return Task.Run(() =>
+            {
+                var results = new List<FileResult>();
 
-  return (
-    <div 
-      className="h-screen overflow-hidden flex items-start justify-center p-2 pt-12"
-      style={{ 
-        backgroundColor: '#F5F5F5',
-        paddingTop: '30px',
-        paddingBottom: '100px'
-      }}
-    >
-      <div className="bg-white space-x-3 rounded-xl shadow-lg w-full max-w-3xl max-h-[85vh] overflow-y-auto p-4">
-        <div className="flex  items-start justify-between mb-4">
-         
-          <h1 className="text-xl font-normal text-black">Profile</h1>
-          {success && (
-            <div className="bg-green-600 w-1/2 text-white text-center px-7 py-4 rounded-lg">
-              {success}
-            </div>
-          )}
-        </div>
-      
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Left: Your information */}
-          <div className="space-y-2">
-            <h2 className="text-sm font-semibold text-red-600">Your information</h2>
-            <div className="flex flex-col space-y-1">
-              <div className="text-base font-bold text-black">
-                {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : 'Craig Johnston'}
-              </div>
-              <div className="text-sm text-black">
-                {user?.email || 'craig.johnston@eversana.com'}
-              </div>
-            </div>
-          </div>
+                string folderRelativeUrl =
+                    relativeUrl.StartsWith("/")
+                        ? relativeUrl.TrimEnd('/')
+                        : "/" + entity.Trim('/') + "/" + relativeUrl.Trim('/');
 
-          {/* Right: Change password */}
-          <div>
-            {/* Confirm Password Section */}
-            <div>
-              <h2 className="text-xs font-semibold text-red-600 mb-3">Confirm Password</h2>
-              <div className="mb-4">
-                 <label className={`block text-sm font-bold mb-1 ${errors.currentPassword ? 'text-red-600' : 'text-black'}`}>Current Password</label>
-              <div className="relative">
-                <input
-                  type={showCurrent ? 'text' : 'password'}
-                  value={currentPassword}
-                  onChange={(e) => {
-                    setCurrentPassword(e.target.value)
-                    if (errors.currentPassword) {
-                      setErrors(prev => ({ ...prev, currentPassword: '' }))
+                try
+                {
+                    using (var ctx = new ClientContext(_siteUrl))
+                    {
+                        ctx.Credentials = _creds;
+                        ctx.RequestTimeout = Timeout.Infinite;
+
+                        var folder = ctx.Web.GetFolderByServerRelativeUrl(folderRelativeUrl);
+                        ctx.Load(folder.Files, fs =>
+                            fs.Include(f => f.Name, f => f.Length, f => f.ServerRelativeUrl));
+                        ctx.ExecuteQuery();
+
+                        int sr = 1;
+                        foreach (SPFile f in folder.Files)
+                        {
+                            results.Add(new FileResult
+                            {
+                                SrNo = sr++,
+                                Entity = entity,
+                                FileName = f.Name,
+                                SizeBytes = f.Length,
+                                SizeKB = Math.Round(f.Length / 1024.0, 2),
+                                SharepointDocumentURL = _siteUrl.TrimEnd('/') + folderRelativeUrl
+                            });
+                        }
                     }
-                  }}
-                     className={`w-full px-2 py-1 bg-gray-100 focus:outline-none focus:ring-1 focus:ring-red-500 ${
-                    errors.currentPassword 
-                         ? 'border border-red-500 rounded-t' 
-                         : 'rounded'
-                  }`}
-                />
-                   <button type="button" onClick={() => setShowCurrent(!showCurrent)} className={`absolute right-2 top-1/2 -translate-y-1/2 ${errors.currentPassword ? 'text-red-500' : 'text-gray-500'}`}>
-                  {showCurrent ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-                <div className={`w-full text-xs px-3 py-2 rounded-b ${errors.currentPassword ? 'bg-red-600 text-white' : 'invisible h-0'}`}>
-                  {errors.currentPassword || 'placeholder'}
-                </div>
-                </div>
-            </div>
+                }
+                catch (Exception ex)
+                {
+                    Program.MissingItems.Add(new MissingResult
+                    {
+                        Entity = entity,
+                        FolderUrl = folderRelativeUrl,
+                        ErrorMessage = ex.Message
+                    });
+                  //  throw;
+                }
 
-            {/* Change Password Section */}
-            <div className="mt-6">
-              <h2 className="text-xs font-semibold text-red-600 mb-3">Change Password</h2>
+                return results;
+            }, ct);
+        }
+    }
 
-              <div className="mb-3">
-                 <label className={`block text-sm font-bold mb-1 ${errors.newPassword ? 'text-red-600' : 'text-black'}`}>New Password</label>
-              <div className="relative">
-                <input
-                  type={showNew ? 'text' : 'password'}
-                  value={newPassword}
-                  onChange={(e) => {
-                    setNewPassword(e.target.value)
-                    if (errors.newPassword) {
-                      setErrors(prev => ({ ...prev, newPassword: '' }))
+
+
+    // ===================== CSV READER =====================
+    public static class CSVReader
+    {
+        public static DataTable ReadCSV(string path)
+        {
+            var dt = new DataTable();
+            using (var parser = new TextFieldParser(path))
+            {
+                parser.TextFieldType = Microsoft.VisualBasic.FileIO.FieldType.Delimited;
+                parser.SetDelimiters(",");
+                parser.HasFieldsEnclosedInQuotes = true;
+
+                foreach (var h in parser.ReadFields())
+                    dt.Columns.Add(h);
+
+                while (!parser.EndOfData)
+                    dt.Rows.Add(parser.ReadFields());
+            }
+            return dt;
+        }
+    }
+
+    // ===================== PROCESS CONTROLLER =====================
+    public class ProcessControllerOptimized
+    {
+        private readonly DataTable _folders;
+        private readonly SharePointHelperOptimized _helper;
+        private readonly int _totalCount;
+        private readonly int _batchSize;
+
+        private readonly Stopwatch _sw = Stopwatch.StartNew();
+        private readonly object _consoleLock = new object();
+
+        private int _processedFolders = 0;
+        private long _processedFiles = 0;
+
+        private int _currentParallel;
+        private readonly int _maxParallel;
+        private readonly int _minParallel = 5;
+
+        private int _success = 0;
+        private int _errors = 0;
+
+        public ProcessControllerOptimized(
+            DataTable dt, int maxParallel, SharePointHelperOptimized helper, int batchSize)
+        {
+            _folders = dt;
+            _helper = helper;
+            _totalCount = dt.Rows.Count;
+            _batchSize = batchSize;
+
+            _maxParallel = maxParallel;
+            _currentParallel = Math.Max(5, maxParallel / 2);
+        }
+
+        public async Task StartInChunksAsync(
+            CancellationToken ct,
+            int chunkSize,
+            Action<List<FileResult>, int> onChunk)
+        {
+            var buffer = new List<FileResult>();
+            int chunkNo = 1;
+
+            for (int i = 0; i < _totalCount; i += _batchSize)
+            {
+                var batch = _folders.AsEnumerable().Skip(i).Take(_batchSize).ToList();
+                var bag = new ConcurrentBag<FileResult>();
+                var throttler = new SemaphoreSlim(_currentParallel);
+
+                var tasks = batch.Select(async row =>
+                {
+                    await throttler.WaitAsync(ct);
+                    try
+                    {
+                        string entity = row["Entity"].ToString();
+                        string path = row["RelativeURL"].ToString();
+
+                        var files = await _helper.GetFilesForFolderAsync(entity, path, ct);
+                        foreach (var f in files)
+                        {
+                            bag.Add(f);
+                            Interlocked.Increment(ref _processedFiles);
+                        }
+
+                        Interlocked.Increment(ref _success);
                     }
-                  }}
-                     className={`w-full px-2 py-1 bg-gray-100 focus:outline-none focus:ring-1 focus:ring-red-500 ${
-                    errors.newPassword 
-                         ? 'border border-red-500 rounded-t' 
-                         : 'rounded'
-                  }`}
-                />
-                   <button type="button" onClick={() => setShowNew(!showNew)} className={`absolute right-2 top-1/2 -translate-y-1/2 ${errors.newPassword ? 'text-red-500' : 'text-gray-500'}`}>
-                  {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-                <div className={`w-full text-xs px-3 py-2 rounded-b ${errors.newPassword ? 'bg-red-600 text-white' : 'invisible h-0'}`}>
-                  {errors.newPassword || 'placeholder'}
-                </div>
-            </div>
-
-              <div className="mb-3">
-                 <label className={`block text-sm font-bold mb-1 ${errors.retypePassword ? 'text-red-600' : 'text-black'}`}>Retype Password</label>
-              <div className="relative">
-                <input
-                  type={showRetype ? 'text' : 'password'}
-                  value={retypePassword}
-                  onChange={(e) => {
-                    setRetypePassword(e.target.value)
-                    if (errors.retypePassword) {
-                      setErrors(prev => ({ ...prev, retypePassword: '' }))
+                    catch
+                    {
+                        Interlocked.Increment(ref _errors);
                     }
-                  }}
-                     className={`w-full px-2 py-1 bg-gray-100 focus:outline-none focus:ring-1 focus:ring-red-500 ${
-                    errors.retypePassword 
-                         ? 'border border-red-500 rounded-t' 
-                         : 'rounded'
-                  }`}
-                />
-                   <button type="button" onClick={() => setShowRetype(!showRetype)} className={`absolute right-2 top-1/2 -translate-y-1/2 ${errors.retypePassword ? 'text-red-500' : 'text-gray-500'}`}>
-                  {showRetype ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-                <div className={`w-full text-xs px-3 py-2 rounded-b ${errors.retypePassword ? 'bg-red-600 text-white' : 'invisible h-0'}`}>
-                  {errors.retypePassword || 'placeholder'}
-                </div>
-            </div>
+                    finally
+                    {
+                        int done = Interlocked.Increment(ref _processedFolders);
+                        PrintProgress(done);
+                        throttler.Release();
+                    }
+                });
 
-            <p className="text-xs text-gray-600">Your password should be at least 8 characters long and include a mix of letters, numbers, and special characters (like !, $, or #).</p>
-            </div>
-          </div>
-        </div>
+                await Task.WhenAll(tasks);
+                AdjustParallelism();
 
-        {failure && (
-          <div className="mt-6 p-3 rounded bg-red-50 text-red-700">
-            {failure}
-          </div>
-        )}
+                buffer.AddRange(bag);
+                while (buffer.Count >= chunkSize)
+                {
+                    var emit = buffer.Take(chunkSize).ToList();
+                    buffer.RemoveRange(0, chunkSize);
+                    onChunk(emit, chunkNo++);
+                }
+            }
 
-        <div className="flex justify-end mt-4">
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className={`bg-gray-100 text-black px-4 py-2 rounded-full flex items-center gap-2 text-sm ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            submit
-            <span className="ml-1">›</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+            if (buffer.Count > 0)
+                onChunk(buffer, chunkNo);
+        }
+
+        private void AdjustParallelism()
+        {
+            int total = _success + _errors;
+            if (total < 20) return;
+
+            double errorRate = (double)_errors / total;
+            if (errorRate < 0.05 && _currentParallel < _maxParallel)
+                _currentParallel++;
+            else if (errorRate > 0.15 && _currentParallel > _minParallel)
+                _currentParallel--;
+
+            _success = _errors = 0;
+        }
+
+        private void PrintProgress(int done)
+        {
+            double pct = (double)done / _totalCount;
+            int barLen = 30;
+            int filled = (int)(pct * barLen);
+
+            string bar = new string('█', filled) + new string('-', barLen - filled);
+
+            double sec = _sw.Elapsed.TotalSeconds;
+            double folderRate = done / Math.Max(1, sec);
+            double fileRate = _processedFiles / Math.Max(1, sec);
+
+            double eta = folderRate > 0
+                ? (_totalCount - done) / folderRate
+                : 0;
+
+            lock (_consoleLock)
+            {
+                Console.Write(
+                    $"\r[{bar}] {pct * 100:0.00}% | " +
+                    $"Folders {done}/{_totalCount} ({folderRate:0.0}/s) | " +
+                    $"Files {_processedFiles:N0} ({fileRate:0.0}/s) | " +
+                    $"Parallel {_currentParallel} | ETA {TimeSpan.FromSeconds(eta):hh\\:mm\\:ss}   ");
+            }
+        }
+    }
+
+    // ===================== PROGRAM =====================
+    public class Program
+    {
+        public static ConcurrentBag<MissingResult> MissingItems = new ConcurrentBag<MissingResult>();
+
+        static async Task Main()
+        {
+            ServicePointManager.DefaultConnectionLimit = 200;
+            ServicePointManager.Expect100Continue = false;
+
+            string siteUrl = "https://spcrm.triplefin.com/";
+            string csvPath = @"C:\Ajay\CRMCore\SharepointDocumentLocation\tf_patientproductenrollment.csv";
+
+            var creds = new NetworkCredential("ajay.ghosalkar", "AG01052026!", "TRIFIN");
+            var helper = new SharePointHelperOptimized(siteUrl, creds);
+            var table = CSVReader.ReadCSV(csvPath);
+
+            var controller = new ProcessControllerOptimized(
+                table, maxParallel: 50, helper, batchSize: 100);
+
+            await controller.StartInChunksAsync(
+                CancellationToken.None,
+                chunkSize: 50000,
+                (chunk, part) =>
+                {
+                    string file = $"tf_patientproductenrollment_Output_Part_{part}.csv";
+                    WriteCsv(chunk, file);
+                    chunk.Clear();
+                });
+
+            if (!MissingItems.IsEmpty)
+                WriteMissingCsv(MissingItems.ToList(), "MissingFiles.csv");
+
+            Console.WriteLine("\nCompleted. Press Enter.");
+            Console.ReadLine();
+        }
+
+        // ===================== CSV WRITERS =====================
+        private static void WriteCsv(List<FileResult> rows, string path)
+        {
+            using var sw = new StreamWriter(path, false, new UTF8Encoding(true));
+            sw.WriteLine("\"SrNo\",\"Entity\",\"FileName\",\"SizeBytes\",\"SizeKB\",\"URL\"");
+            foreach (var r in rows)
+                sw.WriteLine($"\"{r.SrNo}\",\"{r.Entity}\",\"{r.FileName}\",\"{r.SizeBytes}\",\"{r.SizeKB}\",\"{r.SharepointDocumentURL}\"");
+        }
+
+        private static void WriteMissingCsv(List<MissingResult> rows, string path)
+        {
+            using var sw = new StreamWriter(path, false, new UTF8Encoding(true));
+            sw.WriteLine("\"Entity\",\"FolderUrl\",\"Error\"");
+            foreach (var r in rows)
+                sw.WriteLine($"\"{r.Entity}\",\"{r.FolderUrl}\",\"{r.ErrorMessage}\"");
+        }
+    }
 }
-
 
