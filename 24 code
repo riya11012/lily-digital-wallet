@@ -1,371 +1,482 @@
-'use client';
+// Program.cs
+using System;
+using System.Data;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Collections.Concurrent;
+using Amazon;
+using Amazon.S3;
+using Amazon.S3.Transfer;
+using Microsoft.SharePoint.Client;
+using SPFile = Microsoft.SharePoint.Client.File;
+using System.Diagnostics;
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import toast from 'react-hot-toast';
-import { useAuth } from '@/contexts/AuthContext';
 
-interface ValidationErrors {
-  email?: string;
-  password?: string;
-  general?: string;
-}
+namespace SPtoS3SingleExe
+{
+    public class FileResult { public string ServerRelativeUrl; public string Name; public long Length; }
 
-export default function LoginCard() {
-  const { setUser } = useAuth();
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
-  const [rememberMe, setRememberMe] = useState(false);
-  const [errors, setErrors] = useState<ValidationErrors>({});
-  const [touched, setTouched] = useState({
-    email: false,
-    password: false,
-  });
+    public class MissingResult { public string FolderUrl; public string ErrorMessage; }
 
-  // Load remembered email on component mount
-  useEffect(() => {
-    const rememberedEmail = localStorage.getItem('rememberMe_email');
-    if (rememberedEmail) {
-      setFormData(prev => ({ ...prev, email: rememberedEmail }));
-      setRememberMe(true);
-    }
-  }, []);
+    class Program
+    {
+        // ---------- CONFIG ----------
+        private static readonly string SiteUrl = Environment.GetEnvironmentVariable("SP_SITE") ?? "https://spcrm.triplefin.com/";
+        private static readonly string SpUser = Environment.GetEnvironmentVariable("SP_USER") ?? "ajay.ghosalkar";
+        private static readonly string SpPass = Environment.GetEnvironmentVariable("SP_PASS") ?? "AJ25092025!";
+        private static readonly string SpDomain = Environment.GetEnvironmentVariable("SP_DOMAIN") ?? "TRIFIN";
 
-  // Email validation regex
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        private static string ExcelPath = Environment.GetEnvironmentVariable("EXCEL_PATH") ?? @"C:\Ajay\JJPAF\SharepointDocumentPropertyDetails\Incident - Properties Stat";
 
-  // Validate email format
-  const validateEmail = (email: string): string | null => {
-    if (!email.trim()) {
-      return 'Email is required';
-    }
-    if (!emailRegex.test(email)) {
-      return 'Please enter a valid email address';
-    }
-    return null;
-  };
+        private static readonly string AwsKey = Environment.GetEnvironmentVariable("AWS_KEY") ?? "";
+        private static readonly string AwsSecret = Environment.GetEnvironmentVariable("AWS_SECRET") ?? "SrM1m3zLMUXyl3PF7TagE4Jvda3voM+5zLT7skSN";
+        private static readonly string BucketName = Environment.GetEnvironmentVariable("S3_BUCKET") ?? "ps-jjpaf-archive-eversana";
+        private static readonly RegionEndpoint BucketRegion = RegionEndpoint.USEast1;
 
-  // Validate password
-  const validatePassword = (password: string): string | null => {
-    if (!password.trim()) {
-      return 'Password is required';
-    }
-    if (password.length < 6) {
-      return 'Password must be at least 6 characters';
-    }
-    return null;
-  };
+        private static readonly int MaxFolderParallelism = 20;
+        private static readonly int MaxDownloadParallelism = 10;
+        private static readonly int MaxUploadParallelism = 10;
 
-  // Validate all fields
-  const validateForm = (): boolean => {
-    const newErrors: ValidationErrors = {};
+        private static readonly int MaxRetries = 3;
+        private static readonly TimeSpan BaseBackoff = TimeSpan.FromSeconds(2);
 
-    const emailError = validateEmail(formData.email);
-    if (emailError) newErrors.email = emailError;
+        private static int TotalFolders = 0;
+        private static int ProcessedFolders = 0;
+        private static readonly object _progressLock = new object();
+        private static readonly object _csvLock = new object();
+        private static readonly object _consoleLock = new object();
+        private static Stopwatch _stopwatch = Stopwatch.StartNew();
 
-    const passwordError = validatePassword(formData.password);
-    if (passwordError) newErrors.password = passwordError;
+        private static string CheckpointFile;
+        private static string LogCsv;
+        private static string ErrorCsv;
+        // -------------------------------
+        private static double _smoothedSecondsPerFolder = 0;
+        private const double SMOOTH_ALPHA = 0.15; // smoothing factor
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-
-    // Clear error when user starts typing
-    if (errors[name as keyof ValidationErrors]) {
-      setErrors({
-        ...errors,
-        [name]: undefined,
-      });
-    }
-  };
-
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const { name } = e.target;
-    setTouched({
-      ...touched,
-      [name]: true,
-    });
-
-    // Validate on blur
-    if (name === 'email') {
-      const emailError = validateEmail(formData.email);
-      if (emailError) {
-        setErrors({ ...errors, email: emailError });
-      }
-    } else if (name === 'password') {
-      const passwordError = validatePassword(formData.password);
-      if (passwordError) {
-        setErrors({ ...errors, password: passwordError });
-      }
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Mark all fields as touched
-    setTouched({
-      email: true,
-      password: true,
-    });
-
-    // Validate form
-    if (!validateForm()) {
-      toast.error('Please fix the errors below');
-      return;
-    }
-
-    setIsLoading(true);
-    setErrors({});
-
-    try {
-      console.log('[LoginCard] Sending login request with credentials: include');
-
-      const response = await fetch('/api/auth/login', {
-        credentials: 'include',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: formData.email.trim(),
-          password: formData.password,
-          rememberMe,
-        }),
-      });
-
-      const data = await response.json();    
-
-      if (response.ok) {
-        // Store token if provided
-        if (data.token) {
-          localStorage.setItem('authToken', data.token);
+        private static string SanitizeS3Key(string key)
+        {
+            key = key.Replace(" ", "_");
+            key = string.Concat(key.Where(c => c >= 32 && c <= 126));
+            return Uri.EscapeDataString(key);
         }
 
-        //Transform login response to match User interface
-        const normalizedUser = {
-          id: String(data.user.id),
-          first_name: data.user.firstName,
-          last_name: data.user.lastName,
-          email_id: data.user.email,
-          role_id: data.user.roleId,
-          role: {
-            id: data.user.roleId,
-            role_name: data.user.role,
-          },
-        };
+        private static readonly ConcurrentQueue<string> _foldersToProcess = new ConcurrentQueue<string>();
+        private static readonly ConcurrentBag<MissingResult> _missing = new ConcurrentBag<MissingResult>();
 
-        localStorage.setItem('user', JSON.stringify(normalizedUser));
-        setUser(normalizedUser);
-        
-        // ✅ Store email if "remember me" is checked
-        if (rememberMe) {
-          localStorage.setItem('rememberMe_email', formData.email.trim());
-        } else {
-          localStorage.removeItem('rememberMe_email');
+        static void Main(string[] args)
+        {
+            try
+            {
+                Console.WriteLine("Enter entity name:");
+                string entityName = Console.ReadLine();
+
+                string baseCsvFolder = $@"C:\Ajay\JJPAF\SharepointDocumentPropertyDetails\{entityName} - Properties Stat\";
+
+                Console.WriteLine("Enter CSV file name only:");
+                string inputCsv = Console.ReadLine();
+
+                string fullCsvPath = Path.Combine(baseCsvFolder, inputCsv);
+
+                string fileNameWithoutExt = Path.GetFileNameWithoutExtension(inputCsv);
+                string[] parts = fileNameWithoutExt.Split('_');
+
+                string pageValue = parts.FirstOrDefault(p => p.StartsWith("Part", StringComparison.OrdinalIgnoreCase)) ?? "Part1";
+
+                CheckpointFile = $"checkpoint_{pageValue}.txt";
+                LogCsv = $"migration_log_{pageValue}.csv";
+                ErrorCsv = $"migration_errors_{pageValue}.csv";
+
+                ExcelPath = fullCsvPath;
+
+                Console.WriteLine($"Site: {SiteUrl}");
+                Console.WriteLine($"Using CSV: {ExcelPath}");
+                Console.WriteLine($"Checkpoint File: {CheckpointFile}");
+                Console.WriteLine($"Log File: {LogCsv}");
+                Console.WriteLine($"Error File: {ErrorCsv}");
+                Console.WriteLine(); // reserve line for progress bar
+
+                var s3Config = new AmazonS3Config
+                {
+                    RegionEndpoint = BucketRegion,
+                    Timeout = TimeSpan.FromMinutes(10),
+                    ReadWriteTimeout = TimeSpan.FromMinutes(10)
+                };
+
+                var s3Client = new AmazonS3Client(AwsKey, AwsSecret, s3Config);
+                var transferUtility = new TransferUtility(s3Client);
+
+                var doneSet = LoadCheckpoint(CheckpointFile);
+
+                var table = CsvReader.ReadCSV(ExcelPath);
+
+                foreach (DataRow row in table.Rows)
+                {
+                    if (row.ItemArray.Length <= 5) continue;
+                    string csvUrl = Convert.ToString(row[5]);
+                    if (string.IsNullOrWhiteSpace(csvUrl)) continue;
+
+                    try
+                    {
+                        Uri uri = new Uri(csvUrl);
+                        string relative = WebUtility.UrlDecode(uri.AbsolutePath.TrimStart('/'));
+                        string folderRelativeUrl = "/" + relative.TrimEnd('/');
+                        if (!doneSet.Contains(folderRelativeUrl))
+                            _foldersToProcess.Enqueue(folderRelativeUrl);
+                    }
+                    catch (Exception ex)
+                    {
+                        _missing.Add(new MissingResult { FolderUrl = csvUrl, ErrorMessage = "Invalid URL: " + ex.Message });
+                    }
+                }
+
+                TotalFolders = _foldersToProcess.Count;
+                Console.WriteLine($"Folders queued: {TotalFolders}");
+                Console.WriteLine(); // reserve line for progress bar
+                DrawProgressBar(); // initial empty bar
+
+                EnsureCsvHeader(LogCsv, "Folder,FileName,S3Key,SizeBytes,Status,Message,Timestamp");
+                EnsureCsvHeader(ErrorCsv, "Folder,Error,Timestamp");
+
+                var cts = new CancellationTokenSource();
+
+                var folderTasks = new List<Task>();
+                var folderSemaphore = new SemaphoreSlim(MaxFolderParallelism);
+
+                while (_foldersToProcess.TryDequeue(out var folderRelativeUrl))
+                {
+                    folderSemaphore.Wait(cts.Token);
+                    var task = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await ProcessFolderAsync(folderRelativeUrl, transferUtility, doneSet, cts.Token);
+                        }
+                        finally
+                        {
+                            folderSemaphore.Release();
+                        }
+                    }, cts.Token);
+
+                    folderTasks.Add(task);
+                }
+
+                Task.WaitAll(folderTasks.ToArray());
+
+                Console.WriteLine();
+                Console.WriteLine($"Done. Total missing/errored: {_missing.Count}");
+                if (_missing.Count > 0)
+                {
+                    foreach (var m in _missing) Console.WriteLine($"Missing: {m.FolderUrl} -> {m.ErrorMessage}");
+                }
+                Console.ReadLine();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Fatal error: " + ex);
+                Console.ReadLine();
+            }
         }
-        
-        toast.success('Login successful!');
 
-        // Reset form
-        setFormData({ email: '', password: '' });
-        setRememberMe(false);
+        private static void DrawProgressBar()
+        {
+            lock (_consoleLock)
+            {
+                double percent = TotalFolders == 0
+                    ? 1
+                    : (double)ProcessedFolders / TotalFolders;
 
-        //Role-based redirect
-        let redirectPath = '/users'; // Default for SUPER_ADMIN
-        
-        if (data.user.roleId === 2 || data.user.roleId === 3) {
-          redirectPath = '/wallet-invites'; // Study and Site Coordinator
+                int barLength = 40;
+                int filled = (int)(percent * barLength);
+                string bar = "[" + new string('█', filled) + new string('░', barLength - filled) + "]";
+
+                // ETA calculation
+                double elapsedSec = _stopwatch.Elapsed.TotalSeconds;
+                double etaSec = 0;
+
+                if (ProcessedFolders > 0)
+                {
+                    double inst = elapsedSec / ProcessedFolders;
+
+                    // Smooth ETA for stable display
+                    _smoothedSecondsPerFolder =
+                        _smoothedSecondsPerFolder == 0
+                        ? inst
+                        : (SMOOTH_ALPHA * inst) + ((1 - SMOOTH_ALPHA) * _smoothedSecondsPerFolder);
+
+                    int remaining = TotalFolders - ProcessedFolders;
+                    etaSec = remaining * _smoothedSecondsPerFolder;
+                }
+
+                string etaFormatted = TimeSpan.FromSeconds(etaSec).ToString(@"hh\:mm\:ss");
+                string elapsedFormatted = TimeSpan.FromSeconds(elapsedSec).ToString(@"hh\:mm\:ss");
+
+                // Draw progress line (overwrite)
+                Console.SetCursorPosition(0, Console.CursorTop);
+                Console.Write(
+                    $"{bar} {percent * 100:0.0}%  " +
+                    $"({ProcessedFolders}/{TotalFolders})  " +
+                    $"ETA: {etaFormatted}  " +
+                    $"Elapsed: {elapsedFormatted}    "
+                );
+            }
         }
 
-        router.push(redirectPath);
-      } else {
-        // Display the specific error message from the API
-        const errorMessage =
-          data.error || 'The Email or password you provided did not match our records. Please try Again.';
-        setErrors({ general: errorMessage });
-        toast.error(errorMessage);
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      const errorMessage = 'An error occurred during login. Please try again later.';
-      setErrors({ general: errorMessage });
-      toast.error(errorMessage);
-    } finally {
-      setIsLoading(false);
+
+        private static void UpdateProgress()
+        {
+            int prev = Interlocked.Increment(ref ProcessedFolders);
+            DrawProgressBar();
+        }
+
+
+        private static async Task ProcessFolderAsync(string folderRelativeUrl, TransferUtility transferUtility, HashSet<string> doneSet, CancellationToken ct)
+        {
+            List<FileResult> files;
+            try
+            {
+                files = await RetryAsync(() => GetFilesInFolderSafe(folderRelativeUrl), MaxRetries, ct);
+                if (files == null || files.Count == 0)
+                {
+                    AppendCsv(LogCsv, $"{EscapeCsv(folderRelativeUrl)},, ,0,NO_FILES,No files in folder,{DateTime.UtcNow:O}");
+                    AppendCheckpoint(CheckpointFile, folderRelativeUrl);
+                    UpdateProgress();
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                _missing.Add(new MissingResult { FolderUrl = folderRelativeUrl, ErrorMessage = "List error: " + ex.Message });
+                AppendCsv(ErrorCsv, $"{EscapeCsv(folderRelativeUrl)},{EscapeCsv(ex.Message)},{DateTime.UtcNow:O}");
+                UpdateProgress();
+                return;
+            }
+
+            var downloadSemaphore = new SemaphoreSlim(MaxDownloadParallelism);
+            var uploadSemaphore = new SemaphoreSlim(MaxUploadParallelism);
+
+            var fileResults = new ConcurrentBag<bool>();
+            var tasks = new List<Task>();
+
+            foreach (var f in files)
+            {
+                tasks.Add(Task.Run(async () =>
+                {
+                    await downloadSemaphore.WaitAsync(ct);
+                    string tempFile = null;
+                    try
+                    {
+                        tempFile = await RetryAsync(() => Task.FromResult(DownloadFileSafe(f.ServerRelativeUrl)), MaxRetries, ct);
+
+                        string trimmed = folderRelativeUrl.TrimStart('/');
+                        string s3Key = $"Documents/{trimmed}/{f.Name}";
+
+                        await uploadSemaphore.WaitAsync(ct);
+                        try
+                        {
+                            await RetryAsync(() => Task.Run(() => UploadFileSafe(transferUtility, tempFile, s3Key)), MaxRetries, ct);
+                        }
+                        finally
+                        {
+                            uploadSemaphore.Release();
+                        }
+
+                        AppendCsv(LogCsv, $"{EscapeCsv(folderRelativeUrl)},{EscapeCsv(f.Name)},{EscapeCsv(s3Key)},{f.Length},OK,Uploaded,{DateTime.UtcNow:O}");
+                        fileResults.Add(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        fileResults.Add(false);
+                        AppendCsv(LogCsv, $"{EscapeCsv(folderRelativeUrl)},{EscapeCsv(f.Name)},,{f.Length},FAILED,{EscapeCsv(ex.Message)},{DateTime.UtcNow:O}");
+                        _missing.Add(new MissingResult { FolderUrl = folderRelativeUrl, ErrorMessage = $"File {f.Name} -> {ex.Message}" });
+                    }
+                    finally
+                    {
+                        downloadSemaphore.Release();
+                        if (tempFile != null && System.IO.File.Exists(tempFile)) { try { System.IO.File.Delete(tempFile); } catch { } }
+                    }
+                }, ct));
+            }
+
+            await Task.WhenAll(tasks);
+
+            if (fileResults.All(x => x))
+            {
+                AppendCheckpoint(CheckpointFile, folderRelativeUrl);
+            }
+
+            UpdateProgress();
+        }
+
+        private static Task<List<FileResult>> GetFilesInFolderSafe(string folderRelativeUrl)
+        {
+            return Task.Run(() =>
+            {
+                var list = new List<FileResult>();
+                using (var ctx = new ClientContext(SiteUrl))
+                {
+                    ctx.Credentials = new NetworkCredential(SpUser, SpPass, SpDomain);
+                    var folder = ctx.Web.GetFolderByServerRelativeUrl(folderRelativeUrl);
+                    ctx.Load(folder.Files, fs => fs.Include(f => f.Name, f => f.Length, f => f.ServerRelativeUrl));
+                    try { ctx.ExecuteQuery(); }
+                    catch (WebException we)
+                    {
+                        string msg = we.Message;
+                        if (we.Response is HttpWebResponse resp) msg += $" HTTP {(int)resp.StatusCode} {resp.StatusCode}";
+                        throw new Exception("SharePoint list error: " + msg, we);
+                    }
+
+                    foreach (SPFile spf in folder.Files)
+                    {
+                        list.Add(new FileResult { ServerRelativeUrl = spf.ServerRelativeUrl, Name = spf.Name, Length = spf.Length });
+                    }
+                }
+                return list;
+            });
+        }
+
+        private static string DownloadFileSafe(string serverRelativeUrl)
+        {
+            using (var ctx = new ClientContext(SiteUrl))
+            {
+                ctx.Credentials = new NetworkCredential(SpUser, SpPass, SpDomain);
+
+                try
+                {
+                    var fileInfo = SPFile.OpenBinaryDirect(ctx, serverRelativeUrl);
+                    string ext = Path.GetExtension(serverRelativeUrl);
+                    string tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ext);
+
+                    using (var fs = new FileStream(tempFile, FileMode.Create, FileAccess.Write))
+                    {
+                        fileInfo.Stream.CopyTo(fs);
+                    }
+
+                    return tempFile;
+                }
+                catch (WebException we)
+                {
+                    string msg = we.Message;
+                    if (we.Response is HttpWebResponse resp) msg += $" HTTP {(int)resp.StatusCode} {resp.StatusCode}";
+                    throw new Exception("Download error: " + msg, we);
+                }
+            }
+        }
+
+        private static void UploadFileSafe(TransferUtility transferUtility, string localPath, string s3Key)
+        {
+            if (!System.IO.File.Exists(localPath)) throw new FileNotFoundException("Temp file missing: " + localPath);
+
+            var request = new TransferUtilityUploadRequest
+            {
+                BucketName = BucketName,
+                FilePath = localPath,
+                Key = s3Key
+            };
+
+            try { transferUtility.Upload(request); }
+            catch (Exception ex) { throw new Exception("S3 upload error: " + ex.Message, ex); }
+        }
+
+        private static async Task<T> RetryAsync<T>(Func<Task<T>> action, int maxRetries, CancellationToken ct)
+        {
+            int attempt = 0; Exception lastEx = null;
+            while (attempt < maxRetries)
+            {
+                ct.ThrowIfCancellationRequested();
+                try { return await action(); }
+                catch (Exception ex) { lastEx = ex; attempt++; if (attempt >= maxRetries) break; var delay = TimeSpan.FromMilliseconds(BaseBackoff.TotalMilliseconds * Math.Pow(2, attempt - 1)); await Task.Delay(delay, ct); }
+            }
+            throw lastEx ?? new Exception("Unknown retry failure");
+        }
+
+        private static async Task RetryAsync(Func<Task> action, int maxRetries, CancellationToken ct)
+        {
+            await RetryAsync(async () => { await action(); return true; }, maxRetries, ct);
+        }
+
+        private static HashSet<string> LoadCheckpoint(string path)
+        {
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!System.IO.File.Exists(path)) return set;
+            foreach (var l in System.IO.File.ReadAllLines(path)) if (!string.IsNullOrWhiteSpace(l)) set.Add(l.Trim());
+            return set;
+        }
+
+        private static void AppendCheckpoint(string path, string folderRelativeUrl) { lock (_csvLock) { System.IO.File.AppendAllLines(path, new[] { folderRelativeUrl }); } }
+        private static void EnsureCsvHeader(string csvPath, string header) { lock (_csvLock) { if (!System.IO.File.Exists(csvPath)) { System.IO.File.WriteAllText(csvPath, header + Environment.NewLine, Encoding.UTF8); } } }
+        private static void AppendCsv(string csvPath, string line) { lock (_csvLock) { System.IO.File.AppendAllText(csvPath, line + Environment.NewLine, Encoding.UTF8); } }
+        private static string EscapeCsv(string s) { if (s == null) return ""; if (s.Contains(",") || s.Contains("\"") || s.Contains("\n")) return $"\"{s.Replace("\"", "\"\"")}\""; return s; }
     }
-  };
 
-  return (
-    <div 
-      className="flex overflow-hidden shadow-2xl bg-white w-full max-w-[900px] h-fixed h-[400px]"
-      style={{
-        borderRadius: '20px',
-        opacity: 1,
-        aspectRatio: '2 / 1'
-      }}
-    >
-      {/* Left Section (Logo / Branding) */}
-      <div className="w-1/2 bg-[#D31610] text-white flex items-center justify-center overflow-hidden">
-        <img src="/lilly.jpg" alt="Logo" className="w-full h-full object-cover" />
-      </div>
+    public static class CsvReader
+    {
+        public static DataTable ReadCSV(string path)
+        {
+            var dt = new DataTable();
 
-      {/* Right Section (Login Form) */}
-      <div className="w-1/2 flex flex-col justify-center px-8 sm:px-10 md:px-14">
-        <h2 
-          className="text-[#D52B1E] mb-3"
-          style={{
-            fontFamily: 'IBM Plex Sans',
-            fontWeight: 700,
-            fontStyle: 'normal',
-            fontSize: '30px',
-            lineHeight: '100%',
-            letterSpacing: '0%',
-            textTransform: 'capitalize'
-          }}
-        >
-          Login
-        </h2>
+            using (var sr = new StreamReader(path))
+            {
+                bool firstLine = true;
 
-        {/* General Error Message */}
-        {errors.general && (
-          <div className="mb-4 p-1 bg-red-50 border border-red-300 rounded-lg text-red-700 text-sm flex items-start gap-2">
-            <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-            </svg>
-            <span>{errors.general}</span>
-          </div>
-        )}
+                while (!sr.EndOfStream)
+                {
+                    string line = sr.ReadLine();
+                    if (string.IsNullOrWhiteSpace(line)) continue;
 
-        <form className="space-y-0.5" onSubmit={handleSubmit}>
-          <div className="relative">
-            <img 
-              src="/user.png" 
-              alt="User" 
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 pointer-events-none z-10"
-            />
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={formData.email}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              disabled={isLoading}
-              placeholder="Enter your email"
-              className="w-full pl-10 pr-4 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#D31610] disabled:opacity-50"
-              style={{
-                height: '46px',
-                opacity: 1,
-                borderTopLeftRadius: '8px',
-                borderTopRightRadius: '8px',
-              }}
-            />
-          </div>
+                    string[] parts = ParseCsvLine(line);
 
-          <div className="relative">
-            <img 
-              src="/unlock.png" 
-              alt="Password" 
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 pointer-events-none z-10"
-            />
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={formData.password}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              disabled={isLoading}
-              placeholder="Password"
-              className="w-full pl-10 pr-4 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#D31610] disabled:opacity-50"
-              style={{
-                height: '46px',
-                opacity: 1,
-              }}
-            />
-          </div>
+                    if (firstLine)
+                    {
+                        foreach (var col in parts)
+                            dt.Columns.Add(col.Trim());
+                        firstLine = false;
+                    }
+                    else
+                    {
+                        var row = dt.NewRow();
+                        for (int i = 0; i < dt.Columns.Count && i < parts.Length; i++)
+                            row[i] = parts[i];
+                        dt.Rows.Add(row);
+                    }
+                }
+            }
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-[#D31610] text-white font-semibold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              height: '46px',
-              opacity: 1,
-              borderBottomRightRadius: '8px',
-              borderBottomLeftRadius: '8px',
-              borderTopLeftRadius: '0px',
-              borderTopRightRadius: '0px'
-            }}
-          >
-            {isLoading ? (
-              <span className="flex items-center justify-center">
-                <svg
-                  className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                Signing in...
-              </span>
-            ) : (
-              'Login'
-            )}
-          </button>
-        </form>
+            return dt;
+        }
 
-        <div className="mt-3">
-          <a 
-            href="/ForgotPassword" 
-            className="text-blue-600 hover:underline"
-            style={{
-              fontFamily: 'Red Hat Text',
-              fontWeight: 400,
-              fontStyle: 'normal',
-              fontSize: '14px',
-              lineHeight: '20px',
-              letterSpacing: '0px'
-            }}
-          >
-            Forgot Password
-          </a>
-        </div>
+        private static string[] ParseCsvLine(string line)
+        {
+            var result = new List<string>();
+            bool insideQuotes = false;
+            var sb = new StringBuilder();
 
-        <p className="text-xs text-gray-500 pt-14">
-          For help logging in or accessing the portal, please contact{' '}
-          <span className="font-semibold">Lilly Support</span>.
-        </p>
-      </div>
-    </div>
-  );
+            foreach (char c in line)
+            {
+                if (c == '"')
+                {
+                    insideQuotes = !insideQuotes;
+                    continue;
+                }
+
+                if (c == ',' && !insideQuotes)
+                {
+                    result.Add(sb.ToString());
+                    sb.Clear();
+                }
+                else
+                {
+                    sb.Append(c);
+                }
+            }
+
+            result.Add(sb.ToString());
+            return result.ToArray();
+        }
+    }
 }
