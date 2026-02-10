@@ -1,5 +1,103 @@
-Cool 👍 Here’s a **clean, complete list of BASIC JavaScript programs** — **from absolute zero level**, no DSA tricks yet.
-These are the **first programs every full-stack / JS learner should practice** 👇
+Below is your content **with numbered points added in a clean, professional structure** as requested:
+
+---
+
+## **Freelance CRM & Document Migration Consultant**
+
+**Project: JJPAF Document Segregation & Cloud Migration (Dynamics 365 + SharePoint + AWS S3)**
+
+### **Business Requirement:**
+
+The client had a large volume of historical documents stored in an on-premise SharePoint server, which were linked to Dynamics 365 CRM records through document management. These documents needed to be extracted, analyzed, and securely migrated to AWS S3 cloud storage in a structured and easily retrievable format, without breaking any existing CRM integrations or document links.
+
+**Key objectives:**
+
+1. Move documents from SharePoint on-premise to AWS S3 cloud.
+2. Preserve document metadata and structure.
+3. Ensure no impact to the live Dynamics CRM system.
+4. Enable better document organization, accessibility, and long-term storage in cloud.
+
+---
+
+### **Solution Developed:**
+
+To achieve this, a **three-utility migration framework** was designed and implemented in C#.
+
+#### **Utility 1 – SharePoint Folder Discovery Utility**
+
+1. Connected to Dynamics 365 CRM and identified all SharePoint document locations linked to CRM records.
+2. Extracted SharePoint relative URLs for all document folders associated with different CRM entities and records.
+3. Generated a master list of all SharePoint folders that needed to be scanned for documents.
+
+---
+
+#### **Utility 2 – Document Metadata Extraction Utility**
+
+Using the folder list from Utility 1, this utility:
+
+1. Retrieved all documents stored inside each SharePoint folder.
+
+2. Captured important metadata including:
+
+   * Document Name
+   * File Size
+   * File Type (PDF, Word, Excel, etc.)
+   * SharePoint Document URL
+   * Associated CRM Entity and Record
+
+3. Generated a detailed migration report to support:
+
+   * Estimation of total migration volume
+   * Identification of missing or corrupted files
+   * Validation of document readiness before cloud migration
+
+4. Ensured complete visibility of what was being migrated.
+
+---
+
+#### **Utility 3 – SharePoint to AWS S3 Migration Utility**
+
+This utility performed the actual migration:
+
+1. Downloaded documents securely from SharePoint using Microsoft Graph API.
+2. Uploaded all files to AWS S3 cloud storage.
+3. Organized documents in a structured folder hierarchy:
+
+```
+JJPAF  
+   → Entity Name  
+       → CRM Record Name  
+           → Files  
+```
+
+4. This structure enabled:
+
+   * Easy navigation
+   * Better compliance
+   * Faster search and retrieval
+   * Clear mapping between CRM records and cloud documents
+
+---
+
+### **Quality & Reliability Measures Implemented:**
+
+To ensure a smooth migration, the following safeguards were built into the utilities:
+
+1. Batch processing to handle large document volumes.
+2. Retry mechanism for network or system failures.
+3. Duplicate file handling to prevent overwriting.
+4. Error logging and checkpointing to allow migration restart if interrupted.
+5. Post-migration validation through file count matching and sample verification with business stakeholders.
+
+---
+
+### **Technologies Used:**
+
+Dynamics 365 CRM, SharePoint Online, Microsoft Graph API, C#, Power Automate, Azure DevOps, AWS S3
+
+---
+
+If you want, I can convert this into **resume bullets, PPT slides, or interview explanation format.**
 
 ---
 
