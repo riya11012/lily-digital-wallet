@@ -1,732 +1,665 @@
-jb
-using Microsoft.Crm.Sdk.Messages;
-using Microsoft.Xrm.Sdk;
-using Microsoft.Xrm.Sdk.Query;
-using Microsoft.Xrm.Tooling.Connector;
-using System;
-using System.Diagnostics;
-using System.IO;
-using System.Threading;
+**Websockets**
 
-namespace UtilityCaptureEntityLocations
-{
-    internal class Program
-    {
-        static void Main(string[] args)
-        {
-            try
-            {
-                // NOTE: Only org URL, not record URL
-                string url = "https://crmprodapp.triplefin.com/ProdRx365CRM/";
-                string userName = @"ajay.ghosalkar";
-                string password = "AG01052026!";
+WebSockets provide a way to establish a persistent, full-duplex communication channel over a single TCP connection between the client (typically a web browser) and the server.
 
-                string conn = $@"
-                    Url={url};
-                    AuthType=AD;
-                    Domain=TRIFIN;
-                    UserName={userName};
-                    Password={password};
-                ";
+![notion image](https://www.notion.so/image/https%3A%2F%2Fprod-files-secure.s3.us-west-2.amazonaws.com%2F085e8ad8-528e-47d7-8922-a23dc4016453%2F9542e210-145e-44b7-b58d-bc4cd859da32%2FScreenshot_2024-04-06_at_4.38.37_PM.png?table=block&id=fac06f62-9d69-4d4d-8da8-8a9b9fda43d7&cache=v2)
 
-                using (var svc = new CrmServiceClient(conn))
-                {
-                    Console.WriteLine("Execution Started...");
+### **Use Cases for WebSockets:**
 
-                    var response = (WhoAmIResponse)svc.Execute(new WhoAmIRequest());
-                    Console.WriteLine($"Connected to Dynamics successfully. UserId: {response.UserId}");
+- **Real-Time Applications**: Chat applications, live sports updates, real-time gaming, and any application requiring instant updates can benefit from WebSockets.
+- **Live Feeds**: Financial tickers, news feeds, and social media updates are examples where WebSockets can be used to push live data to users.
+- **Interactive Services**: Collaborative editing tools, live customer support chat, and interactive webinars can use WebSockets to enhance user interactio
 
-                    string[] entities = new string[]
-                    {
-                     //"tf_adverseevent"
-                      //  "tf_facility",
-                        // "tf_siteofservice",
-                        // "tf_prescription",
-                         //"tf_generalinquiry",
-                        // "account",
-                        //"contact",
-                        // "tf_patientproductenrollment",
-                        // "tf_productonprogram",
-                        // "tf_productqualitycomplaint",
-// "tf_providerproductenrollment",
-                        "incident"
-                    };
+Good example - https://www.binance.com/en/trade/SOL_USDT?type=spot
 
-                    Program program = new Program();
-                    program.CaptureLocationsInParallel(entities, svc);
+### **Why not use HTTP/REST? Why do you need ws?**
 
-                    Console.WriteLine("Execution Completed.");
-                    Console.ReadLine();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"FATAL ERROR: {ex.Message}");
-            }
-        }
+![notion image](https://www.notion.so/image/https%3A%2F%2Fprod-files-secure.s3.us-west-2.amazonaws.com%2F085e8ad8-528e-47d7-8922-a23dc4016453%2F337fdfd4-982f-4476-b225-c9b705344a54%2FScreenshot_2024-04-06_at_4.43.39_PM.png?table=block&id=c1b393de-60bc-4c09-8143-ae3d34e240ad&cache=v2)
 
-        // ================================
-        // PROCESS ENTITIES SEQUENTIALLY
-        // ================================
-        public void CaptureLocationsInParallel(string[] entities, IOrganizationService service)
-        {
-            foreach (var entity in entities)
-            {
-                try
-                {
-                    CaptureLocationForEntity(entity, service);
-                }
-                catch (Exception ex)
-                {
-                    LogError(entity, ex);
-                    Console.WriteLine($"ERROR for {entity}: {ex.Message}");
-                }
-            }
-        }
+1. Network Handshake happens for every request
+2. No way to push server side events (You can use polling but not the best approach)
 
-        // ================================
-        // CAPTURE LOCATION FOR ONE ENTITY
-        // ================================
-        public void CaptureLocationForEntity(string sEntity, IOrganizationService service)
-        {
-            //string outputFolder = @"C:\Ajay\JJPAF\SharepointDocumentLocation\";
-            string outputFolder = @"C:\Ajay\CRMCore\SharepointDocumentLocation\";
-            Directory.CreateDirectory(outputFolder);
+💡
 
-            string logFolder = Path.Combine(outputFolder, "Logs");
-            Directory.CreateDirectory(logFolder);
+Leetcode uses polling when you submit a problem
 
-            string csvFilePath = Path.Combine(outputFolder, $"{sEntity}.csv");
-            string resumeFilePath = Path.Combine(outputFolder, $"{sEntity}_resume.txt");
-            string logFilePath = Path.Combine(logFolder, $"{sEntity}_{DateTime.Now:yyyyMMdd_HHmm}.log");
+![notion image](https://www.notion.so/image/https%3A%2F%2Fprod-files-secure.s3.us-west-2.amazonaws.com%2F085e8ad8-528e-47d7-8922-a23dc4016453%2F5fada07d-ef88-4927-b5f0-a3daa52fbc6b%2FScreenshot_2024-04-06_at_4.55.10_PM.png?table=block&id=f3dea888-ab96-4813-9e71-c31bd9979955&cache=v2)
 
-            int pageSize = 2000;
-            int maxRetries = 3;
+### Userflow of Client and server
 
-            try
-            {
-                int sNo = 1;
-                int pageNumber = 1;
-                string pagingCookie = null;
+![image.png](attachment:febe8751-6a5d-43e0-9abf-d8fad63e9053:image.png)
 
-                if (File.Exists(resumeFilePath))
-                {
-                    string[] lines = File.ReadAllLines(resumeFilePath);
-                    if (lines.Length >= 2)
-                    {
-                        int.TryParse(lines[0], out pageNumber);
-                        int.TryParse(lines[1], out sNo);
-                    }
-                }
+### WebSocket Server – Backend
 
-                using (var writer = new StreamWriter(csvFilePath, append: true))
-                using (var logWriter = new StreamWriter(logFilePath, append: true))
-                {
-                    if (sNo == 1)
-                        writer.WriteLine("SNo,Name,Entity,RelativeURL,ParentSiteLocation");
+📌 What this server does (one line)
 
-                    Stopwatch sw = new Stopwatch();
-                    sw.Start();
+👉 Accepts WebSocket connections, **pushes messages every 500 ms**, and replies **pong** when it receives **ping**.
 
-                    bool moreRecords = true;
+---
 
-                    while (moreRecords)
-                    {
-                        bool success = false;
-                        int attempt = 0;
+### Step-by-Step Flow
 
-                        while (!success && attempt < maxRetries)
-                        {
-                            try
-                            {
-                                string fetch = BuildFetchXml(sEntity, pageNumber, pageSize, pagingCookie);
-                                EntityCollection result = service.RetrieveMultiple(new FetchExpression(fetch));
+### **Step 1: Server Starts**
 
-                                foreach (var entityRow in result.Entities)
-                                {
-                                    string name = entityRow.GetAttributeValue<string>("name") ?? "";
-                                    string relativeUrl = entityRow.GetAttributeValue<string>("relativeurl") ?? "";
+```jsx
+const wss = new WebSocketServer({ port: 8082 });
 
-                                    string parentSite = "";
-                                    if (entityRow.Contains("parentsiteorlocation"))
-                                    {
-                                        var parentRef = entityRow.GetAttributeValue<EntityReference>("parentsiteorlocation");
-                                        if (parentRef != null)
-                                            parentSite = parentRef.Name ?? "";
-                                    }
+```
 
-                                    writer.WriteLine($"{sNo},\"{name}\",{sEntity},\"{relativeUrl}\",\"{parentSite}\"");
-                                    sNo++;
+- WebSocket server starts on **port 8082**
+- Server waits for incoming client connections
 
-                                    // Show progress
-                                    if (sNo % 100 == 0)
-                                    {
-                                        double elapsedSec = sw.Elapsed.TotalSeconds;
-                                        double rate = sNo / elapsedSec;
-                                        double etaSec = (moreRecords && rate > 0) ? ((pageSize * 1000 - sNo) / rate) : 0;
-                                        Console.Write($"\r{sEntity}: {sNo} records processed | ETA: {TimeSpan.FromSeconds(etaSec):hh\\:mm\\:ss}");
-                                    }
-                                }
+---
 
-                                // Save resume
-                                File.WriteAllLines(resumeFilePath, new string[] { pageNumber.ToString(), sNo.ToString() });
+### **Step 2: Client Connects**
 
-                                moreRecords = result.MoreRecords;
-                                pagingCookie = result.PagingCookie;
-                                pageNumber++;
+```jsx
+wss.on('connection', function (socket) {
 
-                                success = true;
-                            }
-                            catch (Exception ex)
-                            {
-                                attempt++;
-                                logWriter.WriteLine($"{DateTime.Now}: Retry {attempt}/{maxRetries} for page {pageNumber} due to error: {ex.Message}");
-                                Thread.Sleep(5000 * attempt);
+```
 
-                                if (attempt >= maxRetries)
-                                    throw new Exception($"Page {pageNumber} failed after {maxRetries} retries", ex);
-                            }
-                        }
-                    }
+- Triggered when a client opens a WebSocket connection
+- A **new socket object** is created for that client
+- Each connected client has its **own socket**
 
-                    sw.Stop();
-                    logWriter.WriteLine($"{DateTime.Now}: Completed entity {sEntity} → {sNo - 1} records exported.");
+```jsx
+console.log('a new client connected');
 
-                    if (File.Exists(resumeFilePath))
-                        File.Delete(resumeFilePath);
-                }
+```
 
-                Console.WriteLine($"\nCompleted entity: {sEntity} → CSV Exported Successfully.");
-            }
-            catch (Exception ex)
-            {
-                LogError(sEntity, ex);
-                Console.WriteLine($"\nERROR for entity {sEntity}: {ex.Message}");
-            }
-        }
+- Logs connection event
 
-        // ================================
-        // BUILD FETCHXML
-        // ================================
-        private string BuildFetchXml(string entityName, int page, int pageSize, string cookie)
-        {
-            string cookiePart = string.IsNullOrEmpty(cookie) ? "" : $"<paging-cookie>{System.Security.SecurityElement.Escape(cookie)}</paging-cookie>";
+---
 
-            return $@"
-<fetch version='1.0' no-lock='true' count='{pageSize}' page='{page}'>
-  <entity name='sharepointdocumentlocation'>
-    <attribute name='name'/>
-    <attribute name='parentsiteorlocation'/>
-    <attribute name='relativeurl'/>
-    <attribute name='regardingobjectid'/>
-    <link-entity name='{entityName}' from='{entityName}id' to='regardingobjectid' link-type='inner'/>
-  </entity>
-  {cookiePart}
-</fetch>";
-        }
+### **Step 3: Server Pushes Messages Automatically**
 
-        // ================================
-        // ERROR LOGGING
-        // ================================
-        private void LogError(string entityName, Exception ex)
-        {
-            try
-            {
-                string logFolder = @"C:\Ajay\JJPAF\SharepointDocumentLocation\Logs";
-                Directory.CreateDirectory(logFolder);
-                string logFilePath = Path.Combine(logFolder, $"{entityName}_ERROR.log");
+```jsx
+setInterval(() => {
+  socket.send('welcome to the server');
+}, 500);
 
-                using (var logWriter = new StreamWriter(logFilePath, append: true))
-                {
-                    logWriter.WriteLine($"{DateTime.Now}: {ex.Message}");
-                    logWriter.WriteLine(ex.StackTrace);
-                    logWriter.WriteLine("------------------------------------------------");
-                }
-            }
-            catch { }
-        }
-    }
+```
+
+- Every **500 milliseconds**, server sends a message
+- Demonstrates **server → client real-time push**
+- This happens **without client requesting anything**
+
+⚠️ Runs continuously until client disconnects
+
+---
+
+### **Step 4: Server Listens for Client Messages**
+
+```jsx
+socket.on('message', (e) => {
+
+```
+
+- Listens for incoming data from the client
+- `e` arrives as a **Buffer**
+
+---
+
+### **Step 5: Ping → Pong Logic**
+
+```jsx
+if (e.toString() === 'ping') {
+  socket.send('pong');
 }
 
-// Program.cs
-using System;
-using System.Data;
-using System.IO;
-using System.Linq;
-using System.Net;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Collections.Concurrent;
-using Amazon;
-using Amazon.S3;
-using Amazon.S3.Transfer;
-using Microsoft.SharePoint.Client;
-using SPFile = Microsoft.SharePoint.Client.File;
-using System.Diagnostics;
-
-
-namespace SPtoS3SingleExe
-{
-    public class FileResult { public string ServerRelativeUrl; public string Name; public long Length; }
-
-    public class MissingResult { public string FolderUrl; public string ErrorMessage; }
-
-    class Program
-    {
-        // ---------- CONFIG ----------
-        private static readonly string SiteUrl = Environment.GetEnvironmentVariable("SP_SITE") ?? "https://spcrm.triplefin.com/";
-        private static readonly string SpUser = Environment.GetEnvironmentVariable("SP_USER") ?? "ajay.ghosalkar";
-        private static readonly string SpPass = Environment.GetEnvironmentVariable("SP_PASS") ?? "AJ25092025!";
-        private static readonly string SpDomain = Environment.GetEnvironmentVariable("SP_DOMAIN") ?? "TRIFIN";
-
-        private static string ExcelPath = Environment.GetEnvironmentVariable("EXCEL_PATH") ?? @"C:\Ajay\JJPAF\SharepointDocumentPropertyDetails\Incident - Properties Stat";
-
-        private static readonly string AwsKey = Environment.GetEnvironmentVariable("AWS_KEY") ?? "";
-        private static readonly string AwsSecret = Environment.GetEnvironmentVariable("AWS_SECRET") ?? "SrM1m3zLMUXyl3PF7TagE4Jvda3voM+5zLT7skSN";
-        private static readonly string BucketName = Environment.GetEnvironmentVariable("S3_BUCKET") ?? "ps-jjpaf-archive-eversana";
-        private static readonly RegionEndpoint BucketRegion = RegionEndpoint.USEast1;
-
-        private static readonly int MaxFolderParallelism = 20;
-        private static readonly int MaxDownloadParallelism = 10;
-        private static readonly int MaxUploadParallelism = 10;
-
-        private static readonly int MaxRetries = 3;
-        private static readonly TimeSpan BaseBackoff = TimeSpan.FromSeconds(2);
-
-        private static int TotalFolders = 0;
-        private static int ProcessedFolders = 0;
-        private static readonly object _progressLock = new object();
-        private static readonly object _csvLock = new object();
-        private static readonly object _consoleLock = new object();
-        private static Stopwatch _stopwatch = Stopwatch.StartNew();
-
-        private static string CheckpointFile;
-        private static string LogCsv;
-        private static string ErrorCsv;
-        // -------------------------------
-        private static double _smoothedSecondsPerFolder = 0;
-        private const double SMOOTH_ALPHA = 0.15; // smoothing factor
-
-        private static string SanitizeS3Key(string key)
-        {
-            key = key.Replace(" ", "_");
-            key = string.Concat(key.Where(c => c >= 32 && c <= 126));
-            return Uri.EscapeDataString(key);
-        }
-
-        private static readonly ConcurrentQueue<string> _foldersToProcess = new ConcurrentQueue<string>();
-        private static readonly ConcurrentBag<MissingResult> _missing = new ConcurrentBag<MissingResult>();
-
-        static void Main(string[] args)
-        {
-            try
-            {
-                Console.WriteLine("Enter entity name:");
-                string entityName = Console.ReadLine();
-
-                string baseCsvFolder = $@"C:\Ajay\JJPAF\SharepointDocumentPropertyDetails\{entityName} - Properties Stat\";
-
-                Console.WriteLine("Enter CSV file name only:");
-                string inputCsv = Console.ReadLine();
-
-                string fullCsvPath = Path.Combine(baseCsvFolder, inputCsv);
-
-                string fileNameWithoutExt = Path.GetFileNameWithoutExtension(inputCsv);
-                string[] parts = fileNameWithoutExt.Split('_');
-
-                string pageValue = parts.FirstOrDefault(p => p.StartsWith("Part", StringComparison.OrdinalIgnoreCase)) ?? "Part1";
-
-                CheckpointFile = $"checkpoint_{pageValue}.txt";
-                LogCsv = $"migration_log_{pageValue}.csv";
-                ErrorCsv = $"migration_errors_{pageValue}.csv";
-
-                ExcelPath = fullCsvPath;
-
-                Console.WriteLine($"Site: {SiteUrl}");
-                Console.WriteLine($"Using CSV: {ExcelPath}");
-                Console.WriteLine($"Checkpoint File: {CheckpointFile}");
-                Console.WriteLine($"Log File: {LogCsv}");
-                Console.WriteLine($"Error File: {ErrorCsv}");
-                Console.WriteLine(); // reserve line for progress bar
-
-                var s3Config = new AmazonS3Config
-                {
-                    RegionEndpoint = BucketRegion,
-                    Timeout = TimeSpan.FromMinutes(10),
-                    ReadWriteTimeout = TimeSpan.FromMinutes(10)
-                };
-
-                var s3Client = new AmazonS3Client(AwsKey, AwsSecret, s3Config);
-                var transferUtility = new TransferUtility(s3Client);
-
-                var doneSet = LoadCheckpoint(CheckpointFile);
-
-                var table = CsvReader.ReadCSV(ExcelPath);
-
-                foreach (DataRow row in table.Rows)
-                {
-                    if (row.ItemArray.Length <= 5) continue;
-                    string csvUrl = Convert.ToString(row[5]);
-                    if (string.IsNullOrWhiteSpace(csvUrl)) continue;
-
-                    try
-                    {
-                        Uri uri = new Uri(csvUrl);
-                        string relative = WebUtility.UrlDecode(uri.AbsolutePath.TrimStart('/'));
-                        string folderRelativeUrl = "/" + relative.TrimEnd('/');
-                        if (!doneSet.Contains(folderRelativeUrl))
-                            _foldersToProcess.Enqueue(folderRelativeUrl);
-                    }
-                    catch (Exception ex)
-                    {
-                        _missing.Add(new MissingResult { FolderUrl = csvUrl, ErrorMessage = "Invalid URL: " + ex.Message });
-                    }
-                }
-
-                TotalFolders = _foldersToProcess.Count;
-                Console.WriteLine($"Folders queued: {TotalFolders}");
-                Console.WriteLine(); // reserve line for progress bar
-                DrawProgressBar(); // initial empty bar
-
-                EnsureCsvHeader(LogCsv, "Folder,FileName,S3Key,SizeBytes,Status,Message,Timestamp");
-                EnsureCsvHeader(ErrorCsv, "Folder,Error,Timestamp");
-
-                var cts = new CancellationTokenSource();
-
-                var folderTasks = new List<Task>();
-                var folderSemaphore = new SemaphoreSlim(MaxFolderParallelism);
-
-                while (_foldersToProcess.TryDequeue(out var folderRelativeUrl))
-                {
-                    folderSemaphore.Wait(cts.Token);
-                    var task = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            await ProcessFolderAsync(folderRelativeUrl, transferUtility, doneSet, cts.Token);
-                        }
-                        finally
-                        {
-                            folderSemaphore.Release();
-                        }
-                    }, cts.Token);
-
-                    folderTasks.Add(task);
-                }
-
-                Task.WaitAll(folderTasks.ToArray());
-
-                Console.WriteLine();
-                Console.WriteLine($"Done. Total missing/errored: {_missing.Count}");
-                if (_missing.Count > 0)
-                {
-                    foreach (var m in _missing) Console.WriteLine($"Missing: {m.FolderUrl} -> {m.ErrorMessage}");
-                }
-                Console.ReadLine();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Fatal error: " + ex);
-                Console.ReadLine();
-            }
-        }
-
-        private static void DrawProgressBar()
-        {
-            lock (_consoleLock)
-            {
-                double percent = TotalFolders == 0
-                    ? 1
-                    : (double)ProcessedFolders / TotalFolders;
-
-                int barLength = 40;
-                int filled = (int)(percent * barLength);
-                string bar = "[" + new string('█', filled) + new string('░', barLength - filled) + "]";
-
-                // ETA calculation
-                double elapsedSec = _stopwatch.Elapsed.TotalSeconds;
-                double etaSec = 0;
-
-                if (ProcessedFolders > 0)
-                {
-                    double inst = elapsedSec / ProcessedFolders;
-
-                    // Smooth ETA for stable display
-                    _smoothedSecondsPerFolder =
-                        _smoothedSecondsPerFolder == 0
-                        ? inst
-                        : (SMOOTH_ALPHA * inst) + ((1 - SMOOTH_ALPHA) * _smoothedSecondsPerFolder);
-
-                    int remaining = TotalFolders - ProcessedFolders;
-                    etaSec = remaining * _smoothedSecondsPerFolder;
-                }
-
-                string etaFormatted = TimeSpan.FromSeconds(etaSec).ToString(@"hh\:mm\:ss");
-                string elapsedFormatted = TimeSpan.FromSeconds(elapsedSec).ToString(@"hh\:mm\:ss");
-
-                // Draw progress line (overwrite)
-                Console.SetCursorPosition(0, Console.CursorTop);
-                Console.Write(
-                    $"{bar} {percent * 100:0.0}%  " +
-                    $"({ProcessedFolders}/{TotalFolders})  " +
-                    $"ETA: {etaFormatted}  " +
-                    $"Elapsed: {elapsedFormatted}    "
-                );
-            }
-        }
-
-
-        private static void UpdateProgress()
-        {
-            int prev = Interlocked.Increment(ref ProcessedFolders);
-            DrawProgressBar();
-        }
-
-
-        private static async Task ProcessFolderAsync(string folderRelativeUrl, TransferUtility transferUtility, HashSet<string> doneSet, CancellationToken ct)
-        {
-            List<FileResult> files;
-            try
-            {
-                files = await RetryAsync(() => GetFilesInFolderSafe(folderRelativeUrl), MaxRetries, ct);
-                if (files == null || files.Count == 0)
-                {
-                    AppendCsv(LogCsv, $"{EscapeCsv(folderRelativeUrl)},, ,0,NO_FILES,No files in folder,{DateTime.UtcNow:O}");
-                    AppendCheckpoint(CheckpointFile, folderRelativeUrl);
-                    UpdateProgress();
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                _missing.Add(new MissingResult { FolderUrl = folderRelativeUrl, ErrorMessage = "List error: " + ex.Message });
-                AppendCsv(ErrorCsv, $"{EscapeCsv(folderRelativeUrl)},{EscapeCsv(ex.Message)},{DateTime.UtcNow:O}");
-                UpdateProgress();
-                return;
-            }
-
-            var downloadSemaphore = new SemaphoreSlim(MaxDownloadParallelism);
-            var uploadSemaphore = new SemaphoreSlim(MaxUploadParallelism);
-
-            var fileResults = new ConcurrentBag<bool>();
-            var tasks = new List<Task>();
-
-            foreach (var f in files)
-            {
-                tasks.Add(Task.Run(async () =>
-                {
-                    await downloadSemaphore.WaitAsync(ct);
-                    string tempFile = null;
-                    try
-                    {
-                        tempFile = await RetryAsync(() => Task.FromResult(DownloadFileSafe(f.ServerRelativeUrl)), MaxRetries, ct);
-
-                        string trimmed = folderRelativeUrl.TrimStart('/');
-                        string s3Key = $"Documents/{trimmed}/{f.Name}";
-
-                        await uploadSemaphore.WaitAsync(ct);
-                        try
-                        {
-                            await RetryAsync(() => Task.Run(() => UploadFileSafe(transferUtility, tempFile, s3Key)), MaxRetries, ct);
-                        }
-                        finally
-                        {
-                            uploadSemaphore.Release();
-                        }
-
-                        AppendCsv(LogCsv, $"{EscapeCsv(folderRelativeUrl)},{EscapeCsv(f.Name)},{EscapeCsv(s3Key)},{f.Length},OK,Uploaded,{DateTime.UtcNow:O}");
-                        fileResults.Add(true);
-                    }
-                    catch (Exception ex)
-                    {
-                        fileResults.Add(false);
-                        AppendCsv(LogCsv, $"{EscapeCsv(folderRelativeUrl)},{EscapeCsv(f.Name)},,{f.Length},FAILED,{EscapeCsv(ex.Message)},{DateTime.UtcNow:O}");
-                        _missing.Add(new MissingResult { FolderUrl = folderRelativeUrl, ErrorMessage = $"File {f.Name} -> {ex.Message}" });
-                    }
-                    finally
-                    {
-                        downloadSemaphore.Release();
-                        if (tempFile != null && System.IO.File.Exists(tempFile)) { try { System.IO.File.Delete(tempFile); } catch { } }
-                    }
-                }, ct));
-            }
-
-            await Task.WhenAll(tasks);
-
-            if (fileResults.All(x => x))
-            {
-                AppendCheckpoint(CheckpointFile, folderRelativeUrl);
-            }
-
-            UpdateProgress();
-        }
-
-        private static Task<List<FileResult>> GetFilesInFolderSafe(string folderRelativeUrl)
-        {
-            return Task.Run(() =>
-            {
-                var list = new List<FileResult>();
-                using (var ctx = new ClientContext(SiteUrl))
-                {
-                    ctx.Credentials = new NetworkCredential(SpUser, SpPass, SpDomain);
-                    var folder = ctx.Web.GetFolderByServerRelativeUrl(folderRelativeUrl);
-                    ctx.Load(folder.Files, fs => fs.Include(f => f.Name, f => f.Length, f => f.ServerRelativeUrl));
-                    try { ctx.ExecuteQuery(); }
-                    catch (WebException we)
-                    {
-                        string msg = we.Message;
-                        if (we.Response is HttpWebResponse resp) msg += $" HTTP {(int)resp.StatusCode} {resp.StatusCode}";
-                        throw new Exception("SharePoint list error: " + msg, we);
-                    }
-
-                    foreach (SPFile spf in folder.Files)
-                    {
-                        list.Add(new FileResult { ServerRelativeUrl = spf.ServerRelativeUrl, Name = spf.Name, Length = spf.Length });
-                    }
-                }
-                return list;
-            });
-        }
-
-        private static string DownloadFileSafe(string serverRelativeUrl)
-        {
-            using (var ctx = new ClientContext(SiteUrl))
-            {
-                ctx.Credentials = new NetworkCredential(SpUser, SpPass, SpDomain);
-
-                try
-                {
-                    var fileInfo = SPFile.OpenBinaryDirect(ctx, serverRelativeUrl);
-                    string ext = Path.GetExtension(serverRelativeUrl);
-                    string tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ext);
-
-                    using (var fs = new FileStream(tempFile, FileMode.Create, FileAccess.Write))
-                    {
-                        fileInfo.Stream.CopyTo(fs);
-                    }
-
-                    return tempFile;
-                }
-                catch (WebException we)
-                {
-                    string msg = we.Message;
-                    if (we.Response is HttpWebResponse resp) msg += $" HTTP {(int)resp.StatusCode} {resp.StatusCode}";
-                    throw new Exception("Download error: " + msg, we);
-                }
-            }
-        }
-
-        private static void UploadFileSafe(TransferUtility transferUtility, string localPath, string s3Key)
-        {
-            if (!System.IO.File.Exists(localPath)) throw new FileNotFoundException("Temp file missing: " + localPath);
-
-            var request = new TransferUtilityUploadRequest
-            {
-                BucketName = BucketName,
-                FilePath = localPath,
-                Key = s3Key
-            };
-
-            try { transferUtility.Upload(request); }
-            catch (Exception ex) { throw new Exception("S3 upload error: " + ex.Message, ex); }
-        }
-
-        private static async Task<T> RetryAsync<T>(Func<Task<T>> action, int maxRetries, CancellationToken ct)
-        {
-            int attempt = 0; Exception lastEx = null;
-            while (attempt < maxRetries)
-            {
-                ct.ThrowIfCancellationRequested();
-                try { return await action(); }
-                catch (Exception ex) { lastEx = ex; attempt++; if (attempt >= maxRetries) break; var delay = TimeSpan.FromMilliseconds(BaseBackoff.TotalMilliseconds * Math.Pow(2, attempt - 1)); await Task.Delay(delay, ct); }
-            }
-            throw lastEx ?? new Exception("Unknown retry failure");
-        }
-
-        private static async Task RetryAsync(Func<Task> action, int maxRetries, CancellationToken ct)
-        {
-            await RetryAsync(async () => { await action(); return true; }, maxRetries, ct);
-        }
-
-        private static HashSet<string> LoadCheckpoint(string path)
-        {
-            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (!System.IO.File.Exists(path)) return set;
-            foreach (var l in System.IO.File.ReadAllLines(path)) if (!string.IsNullOrWhiteSpace(l)) set.Add(l.Trim());
-            return set;
-        }
-
-        private static void AppendCheckpoint(string path, string folderRelativeUrl) { lock (_csvLock) { System.IO.File.AppendAllLines(path, new[] { folderRelativeUrl }); } }
-        private static void EnsureCsvHeader(string csvPath, string header) { lock (_csvLock) { if (!System.IO.File.Exists(csvPath)) { System.IO.File.WriteAllText(csvPath, header + Environment.NewLine, Encoding.UTF8); } } }
-        private static void AppendCsv(string csvPath, string line) { lock (_csvLock) { System.IO.File.AppendAllText(csvPath, line + Environment.NewLine, Encoding.UTF8); } }
-        private static string EscapeCsv(string s) { if (s == null) return ""; if (s.Contains(",") || s.Contains("\"") || s.Contains("\n")) return $"\"{s.Replace("\"", "\"\"")}\""; return s; }
-    }
-
-    public static class CsvReader
-    {
-        public static DataTable ReadCSV(string path)
-        {
-            var dt = new DataTable();
-
-            using (var sr = new StreamReader(path))
-            {
-                bool firstLine = true;
-
-                while (!sr.EndOfStream)
-                {
-                    string line = sr.ReadLine();
-                    if (string.IsNullOrWhiteSpace(line)) continue;
-
-                    string[] parts = ParseCsvLine(line);
-
-                    if (firstLine)
-                    {
-                        foreach (var col in parts)
-                            dt.Columns.Add(col.Trim());
-                        firstLine = false;
-                    }
-                    else
-                    {
-                        var row = dt.NewRow();
-                        for (int i = 0; i < dt.Columns.Count && i < parts.Length; i++)
-                            row[i] = parts[i];
-                        dt.Rows.Add(row);
-                    }
-                }
-            }
-
-            return dt;
-        }
-
-        private static string[] ParseCsvLine(string line)
-        {
-            var result = new List<string>();
-            bool insideQuotes = false;
-            var sb = new StringBuilder();
-
-            foreach (char c in line)
-            {
-                if (c == '"')
-                {
-                    insideQuotes = !insideQuotes;
-                    continue;
-                }
-
-                if (c == ',' && !insideQuotes)
-                {
-                    result.Add(sb.ToString());
-                    sb.Clear();
-                }
-                else
-                {
-                    sb.Append(c);
-                }
-            }
-
-            result.Add(sb.ToString());
-            return result.ToArray();
-        }
-    }
+```
+
+- Converts message to string
+- If client sends `"ping"`
+- Server responds with `"pong"`
+
+---
+
+## Message Flow Example
+
+```
+Client connects
+↓
+Server logs: "a new client connected"
+↓
+Server sends "welcome to the server" every 500ms
+↓
+Client sends "ping"
+↓
+Server responds "pong"
+```
+
+---
+
+## Frontend(Client)
+
+### What this file does (one line)
+
+👉 Creates a **WebSocket connection**, lets the user **send messages**, and **receives real-time responses** from the server.
+
+---
+
+## Step-by-Step User Flow
+
+---
+
+### **Step 1: App Loads in Browser**
+
+- React renders the `App` component
+- State and refs are initialized
+
+```jsx
+const [socket, setSocket] = useState();
+const inputRef = useRef();
+
+```
+
+- `socket` → will store WebSocket connection
+- `inputRef` → direct access to input field
+
+---
+
+### **Step 2: `useEffect` Runs (Component Mounts)**
+
+```jsx
+useEffect(() => {
+  const ws = new WebSocket("ws://localhost:8080");
+  setSocket(ws);
+}, []);
+
+```
+
+- Runs **only once** (empty dependency array `[]`)
+- Browser opens a **WebSocket connection** to server
+- Connection persists (no repeated HTTP calls)
+
+📌 This avoids opening multiple connections on re-renders
+
+---
+
+### **Step 3: Client Listens for Server Messages**
+
+```jsx
+ws.onmessage = (ev) => {
+  alert(ev.data);
+};
+
+```
+
+- Whenever server sends a message:
+    - Client immediately receives it
+    - Message is shown using `alert`
+- Demonstrates **server → client real-time communication**
+
+---
+
+### **Step 4: User Types a Message**
+
+```jsx
+<input ref={inputRef} />
+
+```
+
+- User enters text
+- `useRef` reads input value
+- No re-render on typing (performance efficient)
+
+---
+
+### **Step 5: User Clicks “Send”**
+
+```jsx
+function sendMessage() {
+  if (!socket) return;
+
+  const message = inputRef.current.value;
+  socket.send(message);
 }
+
+```
+
+- Checks if WebSocket connection exists
+- Reads message from input
+- Sends message to server via WebSocket
+
+📌 Example: user sends `"ping"`
+
+---
+
+### **Step 6: Server Responds**
+
+- Server receives message
+- Server processes it
+- Sends response back (e.g., `"pong"`)
+
+```
+Server → Client
+
+```
+
+---
+
+### **Step 7: Client Receives Response**
+
+```jsx
+ws.onmessage = (ev) => {
+  alert(ev.data);
+};
+
+```
+
+- Message arrives instantly
+- Alert pops up showing server response
+
+---
+
+## Full Timeline (Easy to Visualize)
+
+```
+1. User opens app
+2. WebSocket connection created
+3. Server accepts connection
+4. User types message
+5. User clicks Send
+6. Message sent to server
+7. Server responds
+8. Client receives message → alert
+
+```
+
+---
+
+## Why Each Hook is Used (Interview Gold)
+
+| Hook | Why |
+| --- | --- |
+| `useEffect` | Create WebSocket only once |
+| `useState` | Store socket instance |
+| `useRef` | Read input without re-render |
+
+---
+
+```tsx
+import {WebSocketServer} from  "ws";
+
+const wss=new WebSocketServer({port:3032})
+
+let userCount=0
+
+wss.on("connection",(socket)=>{
+    
+    userCount=userCount+1
+console.log("User connected "+userCount)
+
+socket.on("message",(message)=>{
+    console.log("message received "+ message.toString())
+    setTimeout(()=>{
+        socket.send(message.toString()+"message sent from server")
+    },1000)
+  
+})
+})
+
+//User connected 1
+//User connected 2
+```
+
+This variable is stored in **server memory (RAM)**.
+
+- It exists **inside the Node.js process**
+- It is **global to this file**
+- All WebSocket connections **share the same variable**
+
+👉 It is **NOT** stored in:
+
+- the browser
+- the socket
+- a database
+
+```jsx
+wss.on("connection", (socket) => {
+
+```
+
+This line means:
+
+👉 **“When a new client connects to the WebSocket server, give me an object (`socket`) that represents that connection.”**
+
+---
+
+## 1️⃣ What is `wss`?
+
+```jsx
+const wss = new WebSocketServer({ port: 3032 });
+
+```
+
+- `wss` = **WebSocket Server**
+- It listens for incoming WebSocket connections
+- Think of it like a **phone operator** waiting for calls
+
+---
+
+## 2️⃣ What does `"connection"` mean?
+
+```jsx
+wss.on("connection", ...)
+
+```
+
+- `"connection"` is an **event**
+- It fires **every time a client connects**
+- Example clients:
+    - Browser
+    - Mobile app
+    - Another backend service
+
+---
+
+## 3️⃣ What is `socket`?
+
+```jsx
+(socket) => { ... }
+
+```
+
+`socket` is:
+
+- A **WebSocket object**
+- Represents **ONE connected client**
+- Unique per user
+- Used to:
+    - receive messages
+    - send messages
+    - detect disconnects
+
+📌 Each user gets their **own socket**
+
+---
+
+## 4️⃣ Visual analogy 🧠
+
+Imagine a call center:
+
+- `wss` = call center
+- `"connection"` = phone rings
+- `socket` = one phone call
+
+Each call has its **own line**.
+
+---
+
+## 5️⃣ What can you do with `socket`?
+
+### Receive messages
+
+```jsx
+socket.on("message", (msg) => {
+  console.log(msg.toString());  //message.toString() Converts binary data into readable text
+});
+
+```
+
+### Send messages
+
+```jsx
+socket.send("Hello client!");
+
+```
+
+### Detect disconnect
+
+```jsx
+socket.on("close", () => {
+  console.log("Client disconnected");
+});
+
+```
+
+---
+
+## 6️⃣ Multiple users example
+
+If 5 users connect:
+
+```
+connection → socket1
+connection → socket2
+connection → socket3
+connection → socket4
+connection → socket5
+
+```
+
+All are handled **independently**.
+
+---
+
+## 7️⃣ Important rule ⚠️
+
+⚠️ **Never store user data inside `socket` permanently**
+
+It exists only while the client is connected.
+
+When the client disconnects:
+
+- socket is destroyed
+- memory is freed
+
+---
+
+Broadcast
+
+Msg1 is sent from postman is sent back by server  and same msg2 for hopscotch but the sane msg1 is not sent to hopscotch so for this we need broadcast
+
+![image.png](attachment:16713ec3-0f39-42a4-afcb-6d271775c167:image.png)
+
+```tsx
+import {WebSocketServer,WebSocket} from  "ws";
+
+const wss=new WebSocketServer({port:3033})
+
+let userCount=0
+let allSockets:WebSocket[]=[] //allsockets type(WebSocket) can be seen when hover socket
+
+wss.on("connection",(socket)=>{
+    allSockets.push(socket)
+    userCount=userCount+1
+console.log("User connected "+userCount)
+
+socket.on("message",(message)=>{
+    console.log("message received "+ message.toString())
+    for(let i=0;i<allSockets.length;i++){
+        const s:any=allSockets[i]
+        s.send(message.toString()+"message sent from server")
+    }
+   
+  
+})
+})
+```
+
+We use an `allSockets` array to keep track of all connected clients so the server can talk to more than one client
+
+**Why a single `socket` is not enough**
+
+Inside this code:
+
+```tsx
+wss.on("connection",(socket) => {
+
+```
+
+- `socket` represents **only ONE client**
+- If another user connects, they get a **different socket**
+
+Without storing sockets:
+
+- You can only reply to **the same user**
+- You cannot send messages to **other users**
+
+What `allSockets` actually stores
+
+```tsx
+let allSockets:WebSocket[] = [];
+```
+
+This array stores:
+
+- One `WebSocket` object per connected client
+- All active connections in server memory
+
+Example:
+
+```
+allSockets = [socketA, socketB, socketC]
+```
+
+### 1️⃣ `allSockets.push(socket)`
+
+### What this means
+
+- A **new user just connected**
+- Their WebSocket connection is represented by `socket`
+- You store that socket in an array
+
+📦 After 3 users connect:
+
+```tsx
+allSockets = [socket1, socket2, socket3]
+```
+
+This lets the server **remember every connected client**.
+
+---
+
+### 2️⃣ The `for` loop
+
+```tsx
+for (let i =0; i < allSockets.length; i++)
+```
+
+- Starts from index `0`
+- Goes up to the last socket
+- Runs once **per connected user**
+
+---
+
+### 3️⃣ `const s = allSockets[i]`
+
+- Gets **one socket from the array**
+- `s` is now a **WebSocket connection**
+
+Example during loop:
+
+```
+i = 0 → s = socket1
+i = 1 → s = socket2
+i = 2 → s = socket3
+```
+
+---
+
+### 4️⃣ `s.send(...)`
+
+```tsx
+s.send(message.toString() +" message sent from server");
+```
+
+- Sends a message **to that specific client**
+- Loop repeats → message sent to **every client**
+
+This is called **broadcasting**.
+
+---
+
+### Full real-world flow (chat app example)
+
+1. User A connects → socketA stored
+2. User B connects → socketB stored
+3. User A sends "Hi"
+4. Server loops over `allSockets`
+5. Server sends "Hi" to:
+    - User A
+    - User B
+
+### Chat App
+
+What the user can send
+
+- Join a room
+- Send a message
+
+What the server can send/user receives
+
+- Message
+
+```tsx
+import { WebSocketServer, WebSocket } from "ws";
+
+const wss = new WebSocketServer({ port: 3090 });
+
+interface User {
+  socket: WebSocket;
+  room: string;
+}
+
+let allSockets: User[] = [];
+
+wss.on("connection", (socket) => {
+  console.log("New client connected");
+
+  socket.on("message", (message) => {
+    let parsedMessage;
+
+    try {
+      parsedMessage = JSON.parse(message.toString());
+    } catch (e) {
+      return;
+    }
+
+    // JOIN
+    if (parsedMessage.type === "join") {
+      allSockets.push({
+        socket,
+        room: parsedMessage.payload.roomId
+      });
+
+      console.log("User joined room:", parsedMessage.payload.roomId);
+      console.log("Current users:", allSockets.length);
+      return;
+    }
+
+    // CHAT
+    if (parsedMessage.type === "chat") {
+      let userRoom: string | null = null;
+
+      for (const user of allSockets) {
+        if (user.socket === socket) {
+          userRoom = user.room;
+          break;
+        }
+      }
+
+      console.log("Sender room:", userRoom);
+
+      if (!userRoom) {
+        console.log("User has not joined any room");
+        return;
+      }
+
+      for (const user of allSockets) {
+        if (user.room === userRoom) {
+          user.socket.send(parsedMessage.payload.message);
+        }
+      }
+    }
+  });
+
+  socket.on("close", () => {
+    allSockets = allSockets.filter((u) => u.socket !== socket);
+    console.log("Client disconnected");
+  });
+});
+
+```
