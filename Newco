@@ -1,1 +1,179 @@
-https://shrub-eclipse-f01.notion.site/Dnyamic-Crm-31eb621f7bc68096bf51c3e376c04b62
+Got it — you want **MongoDB topics specifically for interview prep** (not full MERN). Here’s a clean, structured roadmap that covers what interviewers usually expect 👇
+
+---
+
+# 🧠 MongoDB Interview Topics (Structured)
+
+## 1. **MongoDB Basics**
+
+* What is MongoDB?
+* NoSQL vs SQL (differences, when to use each)
+* Document-oriented database concept
+* Collections vs Documents
+* BSON vs JSON
+
+---
+
+## 2. **CRUD Operations (Very Important)**
+
+You *must* be comfortable writing queries:
+
+* `insertOne`, `insertMany`
+* `find`, `findOne`
+* `updateOne`, `updateMany`
+* `deleteOne`, `deleteMany`
+
+👉 Interview focus:
+
+* Query filters (`$gt`, `$lt`, `$in`, `$or`)
+* Projection (selecting fields)
+
+---
+
+## 3. **Data Modeling**
+
+This is a **top interview topic**
+
+* Embedded documents vs References
+* When to denormalize data
+* Schema design patterns
+
+👉 Common questions:
+
+* Design a schema for users/orders/blogs
+* Trade-offs in design
+
+---
+
+## 4. **Indexes (Very Important ⚡)**
+
+* What are indexes?
+* How indexing improves performance
+* Types:
+
+  * Single field
+  * Compound index
+  * Text index
+  * Unique index
+
+👉 Interview focus:
+
+* When NOT to use indexes
+* Index impact on write performance
+
+---
+
+## 5. **Aggregation Framework (High Priority 🚀)**
+
+* `aggregate()` pipeline
+* Stages:
+
+  * `$match`
+  * `$group`
+  * `$sort`
+  * `$project`
+  * `$lookup` (joins in MongoDB)
+
+👉 Very common interview tasks:
+
+* Grouping data (like SQL GROUP BY)
+* Joining collections using `$lookup`
+
+---
+
+## 6. **Schema Validation**
+
+* Enforcing structure in collections
+* JSON Schema validation
+
+---
+
+## 7. **Relationships in MongoDB**
+
+* One-to-One
+* One-to-Many
+* Many-to-Many
+
+👉 How to implement using:
+
+* Embedding
+* Referencing
+
+---
+
+## 8. **Transactions**
+
+* Multi-document transactions
+* ACID properties in MongoDB
+
+👉 Interview tip:
+
+* When transactions are needed vs not
+
+---
+
+## 9. **Replication & Sharding (System Design Basics)**
+
+* Replica Sets (high availability)
+* Sharding (horizontal scaling)
+
+👉 Basic understanding is enough for most interviews:
+
+* Primary vs Secondary nodes
+* Why sharding is needed
+
+---
+
+## 10. **Performance Optimization**
+
+* Query optimization
+* Explain plan (`explain()`)
+* Index usage
+
+---
+
+## 11. **Security Basics**
+
+* Authentication & Authorization
+* Role-based access
+
+---
+
+## 12. **MongoDB with Node.js (Important for MERN)**
+
+* Using Mongoose
+* Schema & Models
+* Validation
+* Middleware (hooks)
+
+---
+
+# 🔥 Must-Know Interview Focus (Shortlist)
+
+If you're short on time, prioritize:
+
+1. CRUD queries
+2. Indexing
+3. Aggregation
+4. Data modeling
+5. `$lookup` (joins)
+6. Basic performance concepts
+
+---
+
+# 💡 Pro Tip
+
+Interviewers often ask:
+
+* “Design a database for X”
+* “Optimize this slow query”
+* “Write an aggregation query”
+
+So practice **hands-on queries**, not just theory.
+
+---
+
+If you want, I can:
+✅ Give you **MongoDB interview questions + answers**
+✅ Create a **30-day prep plan**
+✅ Give **real coding exercises (like interview tasks)**
